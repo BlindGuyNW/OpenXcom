@@ -94,6 +94,8 @@ public:
 	void setMouseActive(bool active);
 	/// Returns whether current state is the param state
 	bool isState(State *state) const;
+	/// Gets the state stack, bottom first.
+	const std::list<State*> &getStates() const { return _states; }
 	/// Returns whether the game is shutting down.
 	bool isQuitting() const;
 	/// Loads the default and current language.

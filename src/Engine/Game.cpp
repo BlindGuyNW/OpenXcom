@@ -40,6 +40,7 @@
 #include "FileMap.h"
 #include "Unicode.h"
 #include "../Menu/TestState.h"
+#include "../Access/Navigator.h"
 
 namespace OpenXcom
 {
@@ -251,6 +252,9 @@ void Game::run()
 					runningState = RUNNING;
 					// Go on, feed the event to others
 				default:
+					// The accessibility layer gets first refusal on keys
+					if (Navigator::handleEvent(this, _event))
+						break;
 					Action action = Action(&_event, _screen->getXScale(), _screen->getYScale(), _screen->getCursorTopBlackBand(), _screen->getCursorLeftBlackBand());
 					_screen->handle(&action);
 					_cursor->handle(&action);
@@ -292,6 +296,7 @@ void Game::run()
 		if (runningState != PAUSED)
 		{
 			// Process logic
+			Navigator::update(this);
 			_states.back()->think();
 			_fpsCounter->think();
 			if (Options::FPS > 0 && !(Options::useOpenGL && Options::vSyncForOpenGL))

@@ -60,8 +60,19 @@ The design follows the Graph A11y Kernel spec at `C:\git\sims2access\docs\graph-
 ### Code layout
 
 - `src/Access/Speech.{h,cpp}`: `Speech::say(text, interrupt)`, `silence()`, `repeatLast()`, `normalize()`. `normalize` strips `TOK_COLOR_FLIP`, `TOK_NL_SMALL`, newlines and NBSP and collapses whitespace. Output is split into chunks of at most 700 bytes. Main thread only.
-- `src/Access/Vocab.{h,cpp}`: the `Vocab::Id` enum plus a string table. Keep the two in the same order.
-- `src/main.cpp`: `Speech::init()` after `Options::init`, and `Speech::shutdown()` on exit.
+- `src/Access/Vocab.{h,cpp}`: the `Vocab::Id` enum plus a string table. Keep the two in the same order. `Vocab::format` fills `{0}`, `{1}` placeholders.
+- `src/Access/Graph/`: the graph kernel, copied verbatim from sims2access (deltas: the namespace is `OpenXcom::Graph`, and one C++20 `std::erase_if` is spelled the C++17 way). STL-only, no game headers. Don't edit it for OpenXcom-specific needs; fix upstream and re-copy.
+- `tests/graph/`: the kernel conformance suite. Run `tests/graph/build.cmd` (needs C++20, so it builds outside the game; output in `build/graphtests/`).
+- `src/Access/Navigator.{h,cpp}`: screen manager plus navigator. Each frame it matches the top `State` against the recipes (poll and diff), keeps a `GraphState` per live `State` so covered screens restore focus, and runs the announce-once differ. `handleEvent` is called from `Game::run` before the game sees an event; it swallows claimed key-downs and their key-ups. It stands down while a `TextEdit` is focused.
+- `src/Access/Screens.{h,cpp}`: the `AccessScreen` recipes (`isActive`, `build`, `name`, `back`) and the registry. Recipes read widgets through `State::getSurfaces()`, so most don't need access to private members.
+- `src/Access/Controls.{h,cpp}`: the one `ControlType` registry and drive helpers. `Controls::click` runs a surface's own press/release/click handlers with a synthetic left click, so sounds and side effects match the mouse.
+- `src/main.cpp`: `Speech::init()` and `Navigator::init()` after `Options::init`, and `Speech::shutdown()` on exit.
+
+### Keys
+
+- Graph screens: arrows move (Left/Right adjust a slider-like control), Home/End jump to the ends, Tab/Shift+Tab cycle zones, Enter activates, Backspace is the secondary action, Space reads the tooltip, Ctrl+L re-reads the focus with its context, Escape is the screen's `back` if it has one (otherwise it goes to the game).
+- Everywhere: Ctrl+R repeats the last speech.
+- Free in OpenXcom's own bindings: F6, Ctrl+R, Ctrl+L. F1 to F5 and F7 to F12 are taken.
 
 ### Key hook points (tactical)
 
@@ -77,7 +88,7 @@ The design follows the Graph A11y Kernel spec at `C:\git\sims2access\docs\graph-
 ## Roadmap
 
 1. ~~Speech wrapper, text cleanup, transcript, vocabulary module, C++17~~ (done)
-2. Graph kernel, navigator, key filter in `Game::run`, screen manager over the `State` stack; prove it on the main menu
+2. ~~Graph kernel, navigator, key filter in `Game::run`, screen manager over the `State` stack; prove it on the main menu~~ (done)
 3. New Battle setup screen
 4. Map exploration layer: tile cursor, confirm via `primaryAction`, selection/cursor differ, parity gating
 5. Action menu, unit and enemy list overlays, event narration

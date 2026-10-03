@@ -31,6 +31,9 @@ namespace
 	{
 		"OpenXcom accessibility loaded",
 		"Nothing to repeat",
+		"button",
+		"{0} of {1}",
+		"No tooltip",
 	};
 }
 
@@ -38,6 +41,20 @@ const std::string &get(Id id)
 {
 	static const std::string empty;
 	return (id >= 0 && id < COUNT) ? _strings[id] : empty;
+}
+
+std::string format(Id id, const std::vector<std::string> &args)
+{
+	std::string s = get(id);
+	for (size_t i = 0; i < args.size(); ++i)
+	{
+		std::string token = "{" + std::to_string(i) + "}";
+		for (size_t pos = s.find(token); pos != std::string::npos; pos = s.find(token, pos + args[i].size()))
+		{
+			s.replace(pos, token.size(), args[i]);
+		}
+	}
+	return s;
 }
 
 }

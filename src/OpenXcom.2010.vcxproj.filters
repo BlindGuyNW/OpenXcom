@@ -942,6 +942,24 @@
     <ClCompile Include="Access\Vocab.cpp">
       <Filter>Access</Filter>
     </ClCompile>
+    <ClCompile Include="Access\Controls.cpp">
+      <Filter>Access</Filter>
+    </ClCompile>
+    <ClCompile Include="Access\Navigator.cpp">
+      <Filter>Access</Filter>
+    </ClCompile>
+    <ClCompile Include="Access\Screens.cpp">
+      <Filter>Access</Filter>
+    </ClCompile>
+    <ClCompile Include="Access\Graph\GraphAnnouncer.cpp">
+      <Filter>Access\Graph</Filter>
+    </ClCompile>
+    <ClCompile Include="Access\Graph\GraphBuilder.cpp">
+      <Filter>Access\Graph</Filter>
+    </ClCompile>
+    <ClCompile Include="Access\Graph\KeyGraph.cpp">
+      <Filter>Access\Graph</Filter>
+    </ClCompile>
     <ClCompile Include="Engine\Unicode.cpp">
       <Filter>Engine</Filter>
     </ClCompile>
@@ -1936,6 +1954,30 @@
     <ClInclude Include="Access\Vocab.h">
       <Filter>Access</Filter>
     </ClInclude>
+    <ClInclude Include="Access\Controls.h">
+      <Filter>Access</Filter>
+    </ClInclude>
+    <ClInclude Include="Access\Navigator.h">
+      <Filter>Access</Filter>
+    </ClInclude>
+    <ClInclude Include="Access\Screens.h">
+      <Filter>Access</Filter>
+    </ClInclude>
+    <ClInclude Include="Access\Graph\ControlId.hpp">
+      <Filter>Access\Graph</Filter>
+    </ClInclude>
+    <ClInclude Include="Access\Graph\GraphAnnouncer.hpp">
+      <Filter>Access\Graph</Filter>
+    </ClInclude>
+    <ClInclude Include="Access\Graph\GraphBuilder.hpp">
+      <Filter>Access\Graph</Filter>
+    </ClInclude>
+    <ClInclude Include="Access\Graph\GraphTypes.hpp">
+      <Filter>Access\Graph</Filter>
+    </ClInclude>
+    <ClInclude Include="Access\Graph\KeyGraph.hpp">
+      <Filter>Access\Graph</Filter>
+    </ClInclude>
     <ClInclude Include="Engine\Unicode.h">
       <Filter>Engine</Filter>
     </ClInclude>
@@ -1955,6 +1997,9 @@
     </Filter>
     <Filter Include="Access">
       <UniqueIdentifier>{5d3c8e1a-7b42-4f0e-9a6d-2c1b8f4e7a90}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Access\Graph">
+      <UniqueIdentifier>{b7e2c4d1-3f6a-4e8b-9c0d-1a2b3c4d5e6f}</UniqueIdentifier>
     </Filter>
     <Filter Include="Engine">
       <UniqueIdentifier>{8fafa8d9-0283-4082-9361-01ebd937e3bb}</UniqueIdentifier>

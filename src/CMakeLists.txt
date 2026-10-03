@@ -6,6 +6,12 @@ set ( root_src
 set ( access_src
   Access/Speech.cpp
   Access/Vocab.cpp
+  Access/Controls.cpp
+  Access/Navigator.cpp
+  Access/Screens.cpp
+  Access/Graph/GraphAnnouncer.cpp
+  Access/Graph/GraphBuilder.cpp
+  Access/Graph/KeyGraph.cpp
 )
 
 set ( basescape_src

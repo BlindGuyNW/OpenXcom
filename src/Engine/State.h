@@ -62,6 +62,8 @@ public:
 	virtual ~State();
 	/// Set interface rules.
 	void setInterface(const std::string &s, bool alterPal = false, SavedBattleGame *battleGame = 0);
+	/// Gets the state's child elements, in the order they were added.
+	const std::vector<Surface*> &getSurfaces() const { return _surfaces; }
 	/// Adds a child element to the state.
 	void add(Surface *surface);
 	/// Adds a child element to the state.

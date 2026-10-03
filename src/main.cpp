@@ -25,6 +25,7 @@
 #include "Menu/StartState.h"
 #include "Access/Speech.h"
 #include "Access/Vocab.h"
+#include "Access/Navigator.h"
 
 /** @mainpage
  * @author OpenXcom Developers
@@ -116,6 +117,7 @@ int main(int argc, char *argv[])
 		Logger::reportingLevel() = LOG_VERBOSE;
 	Speech::init();
 	Speech::say(Vocab::get(Vocab::STARTUP), false);
+	Navigator::init();
 	Options::baseXResolution = Options::displayWidth;
 	Options::baseYResolution = Options::displayHeight;
 

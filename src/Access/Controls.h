@@ -17,33 +17,29 @@
  * You should have received a copy of the GNU General Public License
  * along with OpenXcom.  If not, see <http://www.gnu.org/licenses/>.
  */
-#include <string>
-#include <vector>
+#include <SDL.h>
+#include "Graph/GraphTypes.hpp"
 
 namespace OpenXcom
 {
 
-/**
- * Every string the accessibility layer authors itself (graph a11y spec A8).
- * Game content is already localized and never goes through here.
- * English only for now; the table in Vocab.cpp is the one place to translate.
- */
-namespace Vocab
-{
-	enum Id
-	{
-		STARTUP,
-		NOTHING_TO_REPEAT,
-		ROLE_BUTTON,
-		POSITION,
-		NO_TOOLTIP,
-		COUNT
-	};
+class State;
+class InteractiveSurface;
+class TextButton;
 
-	/// Gets the text for a vocabulary entry.
-	const std::string &get(Id id);
-	/// Gets the text for a vocabulary entry with {0}, {1}... replaced by the arguments.
-	std::string format(Id id, const std::vector<std::string> &args);
+/**
+ * Building blocks for graph screen recipes: the one control type registry
+ * (graph a11y spec 3.3) and helpers that drive the game's own widgets (A5).
+ */
+namespace Controls
+{
+	/// The "button" control type.
+	const Graph::ControlType &button();
+	/// Clicks a surface the way the mouse would: press, release, click.
+	/// Runs the surface's own handlers, so sounds and side effects match a real click.
+	void click(State *state, InteractiveSurface *surface, Uint8 mouseButton = SDL_BUTTON_LEFT);
+	/// A node for a text button: its visible text as the label, Enter clicks it.
+	Graph::NodeVtable textButton(State *state, TextButton *button);
 }
 
 }
