@@ -78,6 +78,7 @@ namespace
 		"{0}, {1} time units",
 		"{0}, {1} of {2} time units, health {3} of {4}, energy {5} of {6}, morale {7}",
 		"kneeling",
+		"standing",
 		"facing {0}",
 		"left hand {0}",
 		"right hand {0}",

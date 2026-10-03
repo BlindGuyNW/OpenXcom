@@ -65,6 +65,8 @@ namespace
 	std::map<BattleUnit *, int> _health;
 	/// Was the game waiting for a target last frame?
 	bool _wasTargeting = false;
+	/// The selected soldier's stance last frame.
+	bool _kneeled = false;
 	/// We started an action; speak the result once the game is idle again.
 	bool _awaiting = false;
 	/// When Ctrl+E was first pressed; a second press soon after ends the turn.
@@ -882,10 +884,18 @@ void update(BattlescapeState *state)
 		if (selected && selected->getFaction() == FACTION_PLAYER && save->getSide() == FACTION_PLAYER)
 		{
 			_soldier = selected;
+			_kneeled = selected->isKneeled();
 			_cursor = selected->getPosition();
 			showCursor(state);
 			say(unitSummary(state, selected), true);
 		}
+	}
+
+	// Kneeling or standing up, almost always a reply to K.
+	if (_soldier && !_soldier->isOut() && _soldier->isKneeled() != _kneeled)
+	{
+		_kneeled = _soldier->isKneeled();
+		say(Vocab::get(_kneeled ? Vocab::KNEELING : Vocab::STANDING), true);
 	}
 
 	// Newly spotted hostiles, queued since they're narration rather than a reply to a key.
