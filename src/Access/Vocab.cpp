@@ -138,6 +138,8 @@ namespace
 		"missed, hit {0}",
 		"explosion hits no one",
 		"solid",
+		"{0} {1}",
+		"lost sight of {0}",
 	};
 }
 

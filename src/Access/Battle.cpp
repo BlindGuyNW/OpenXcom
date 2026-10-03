@@ -36,11 +36,13 @@
 #include "../Battlescape/Projectile.h"
 #include "../Battlescape/TileEngine.h"
 #include "../Engine/Game.h"
+#include "../Engine/Language.h"
 #include "../Engine/LocalizedText.h"
 #include "../Engine/Options.h"
 #include "../Interface/Cursor.h"
 #include "../Mod/MapData.h"
 #include "../Mod/RuleItem.h"
+#include "../Mod/Unit.h"
 #include "../Savegame/BattleItem.h"
 #include "../Savegame/BattleUnit.h"
 #include "../Savegame/SavedBattleGame.h"
@@ -177,10 +179,31 @@ namespace
 		return Vocab::format(toward ? Vocab::FACING_YOU : Vocab::FACING, { dirName(unit->getDirection()) });
 	}
 
-	/// A shown unit's name, plus its facing if it's hostile.
+	/// Sighting numbers for units that aren't ours: given when a unit is first named while
+	/// in view, retired when it leaves view, and never reused, so an alien seen again gets a
+	/// new number (a sighted player can't tell whether it's the same one either).
+	std::map<BattleUnit *, int> _labels;
+	std::map<std::string, int> _lastLabel;
+
+	/// What a sighted player can tell a unit by. Ours by name; others by race, since every rank
+	/// shares one sprite (the game shows ranks only in panic messages, mind probes and on a
+	/// stunned body), plus their sighting number: "Sectoid 2".
+	std::string unitLabel(BattleUnit *unit)
+	{
+		Language *lang = State::getGamePtr()->getLanguage();
+		if (unit->getFaction() == FACTION_PLAYER || !unit->getUnitRules())
+			return unit->getName(lang);
+		std::string race = lang->getString(unit->getUnitRules()->getRace());
+		int &n = _labels[unit];
+		if (!n)
+			n = ++_lastLabel[race];
+		return Vocab::format(Vocab::UNIT_NUMBER, { race, num(n) });
+	}
+
+	/// A shown unit's label, plus its facing if it's hostile.
 	std::string unitName(BattlescapeState *state, BattleUnit *unit)
 	{
-		return joinComma({ unit->getName(state->getGame()->getLanguage()), facingText(unit) });
+		return joinComma({ unitLabel(unit), facingText(unit) });
 	}
 
 	std::string itemText(BattlescapeState *state, BattleItem *item)
@@ -901,21 +924,20 @@ namespace
 		_shotAt = at;
 		_shotTime = now;
 
-		Language *lang = state->getGame()->getLanguage();
 		Tile *atTile = save->getTile(at);
 		BattleUnit *target = atTile ? atTile->getUnit() : 0;
 		if (!unitShown(target))
 			target = 0;
 		if (unitShown(shooter))
 		{
-			std::string name = shooter->getName(lang);
-			say(target ? Vocab::format(Vocab::UNIT_FIRES_AT, { name, target->getName(lang) }) : Vocab::format(Vocab::UNIT_FIRES, { name }), false);
+			std::string name = unitLabel(shooter);
+			say(target ? Vocab::format(Vocab::UNIT_FIRES_AT, { name, unitLabel(target) }) : Vocab::format(Vocab::UNIT_FIRES, { name }), false);
 			return;
 		}
 		std::string bearing = bearingText(at, from);
 		if (bearing.empty())
 			return;
-		say(target ? Vocab::format(Vocab::FIRE_FROM_AT, { bearing, target->getName(lang) }) : Vocab::format(Vocab::FIRE_FROM, { bearing }), false);
+		say(target ? Vocab::format(Vocab::FIRE_FROM_AT, { bearing, unitLabel(target) }) : Vocab::format(Vocab::FIRE_FROM, { bearing }), false);
 	}
 
 	void reset(SavedBattleGame *save)
@@ -931,6 +953,8 @@ namespace
 		_shotTime = 0;
 		_reportShot = false;
 		_before.clear();
+		_labels.clear();
+		_lastLabel.clear();
 		_scanCategory = SCAN_SOLDIERS;
 		_scanCurrent.unit = 0;
 		_scanCurrent.tag = -1;
@@ -1084,7 +1108,7 @@ void update(BattlescapeState *state)
 		visible.insert(unit);
 		if (_spotted.find(unit) == _spotted.end())
 		{
-			say(joinComma({ Vocab::format(Vocab::SPOTTED, { unit->getName(state->getGame()->getLanguage()), offsetText(anchor(), unit->getPosition()) }), facingText(unit) }), false);
+			say(joinComma({ Vocab::format(Vocab::SPOTTED, { unitLabel(unit), offsetText(anchor(), unit->getPosition()) }), facingText(unit) }), false);
 		}
 	}
 	_spotted.swap(visible);
@@ -1093,20 +1117,32 @@ void update(BattlescapeState *state)
 	std::set<BattleUnit *> shown;
 	for (BattleUnit *unit : *save->getUnits())
 	{
-		std::string name = unit->getName(state->getGame()->getLanguage());
 		if (unitShown(unit))
 			shown.insert(unit);
 		else if (_shown.count(unit) && unit->isOut())
-			say(Vocab::format(unit->getStatus() == STATUS_DEAD ? Vocab::UNIT_KILLED : Vocab::UNIT_UNCONSCIOUS, { name }), false);
+			say(Vocab::format(unit->getStatus() == STATUS_DEAD ? Vocab::UNIT_KILLED : Vocab::UNIT_UNCONSCIOUS, { unitLabel(unit) }), false);
 		if (unit->getFaction() == FACTION_PLAYER && !unit->isOut())
 		{
 			std::map<BattleUnit *, int>::iterator h = _health.find(unit);
 			if (h != _health.end() && unit->getHealth() < h->second && unit->getHealth() > 0)
-				say(Vocab::format(Vocab::UNIT_WOUNDED, { name, num(unit->getHealth()) }), false);
+				say(Vocab::format(Vocab::UNIT_WOUNDED, { unitLabel(unit), num(unit->getHealth()) }), false);
 			_health[unit] = unit->getHealth();
 		}
 	}
 	_shown.swap(shown);
+
+	// Retire the numbers of units that left view; ones that went down were just spoken.
+	for (std::map<BattleUnit *, int>::iterator l = _labels.begin(); l != _labels.end();)
+	{
+		if (unitShown(l->first))
+		{
+			++l;
+			continue;
+		}
+		if (!l->first->isOut())
+			say(Vocab::format(Vocab::OUT_OF_SIGHT, { unitLabel(l->first) }), false);
+		l = _labels.erase(l);
+	}
 
 	// Shots, spoken as they leave so they come before any hit or death.
 	Projectile *projectile = state->getMap()->getProjectile();
@@ -1151,7 +1187,7 @@ namespace
 	{
 		if (unit->getHealth() == 0 || unit->getStunlevel() >= unit->getHealth())
 			return std::string();
-		std::string name = unit->getName(State::getGamePtr()->getLanguage());
+		std::string name = unitLabel(unit);
 		if (unit->getFaction() == FACTION_PLAYER && unit->getHealth() < before.health)
 		{
 			_health[unit] = unit->getHealth();
