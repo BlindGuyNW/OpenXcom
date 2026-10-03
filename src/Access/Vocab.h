@@ -41,6 +41,7 @@ namespace Vocab
 		NO_TOOLTIP,
 		INVENTORY,
 		CONTINUE,
+		LIST,
 		COUNT
 	};
 

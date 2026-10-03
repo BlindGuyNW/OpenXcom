@@ -129,6 +129,8 @@ public:
 	void setDot(bool dot);
 	/// Sets whether the list is selectable.
 	void setSelectable(bool selectable);
+	/// Gets whether the rows are selectable.
+	bool isSelectable() const;
 	/// Sets the text size to big.
 	void setBig();
 	/// Sets the text size to small.
@@ -139,6 +141,10 @@ public:
 	void setBackground(Surface *bg);
 	/// Gets the selected row in the list.
 	unsigned int getSelectedRow() const;
+	/// Makes a text row the selected one, as if the mouse were over it.
+	void setSelectedRow(size_t row);
+	/// Gets the number of cells in a text row.
+	size_t getCellCount(size_t row) const;
 	/// Sets the margin of the text list.
 	void setMargin(int margin);
 	/// Gets the margin of the text list.

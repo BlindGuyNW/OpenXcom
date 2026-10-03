@@ -38,6 +38,7 @@ namespace
 		"No tooltip",
 		"Inventory, {0}",
 		"Continue",
+		"list",
 	};
 }
 

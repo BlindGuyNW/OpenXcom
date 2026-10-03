@@ -29,6 +29,7 @@ class InteractiveSurface;
 class TextButton;
 class ComboBox;
 class Slider;
+class TextList;
 
 /**
  * Building blocks for graph screen recipes: the one control type registry
@@ -45,6 +46,13 @@ namespace Controls
 	/// Clicks a surface the way the mouse would: press, release, click.
 	/// Runs the surface's own handlers, so sounds and side effects match a real click.
 	void click(State *state, InteractiveSurface *surface, Uint8 mouseButton = SDL_BUTTON_LEFT);
+	/// Clicks a list row: selects it as hovering would, then clicks near the row's left edge,
+	/// clear of any arrow column, so the state's handlers see that row.
+	void clickRow(State *state, TextList *list, size_t row, Uint8 mouseButton = SDL_BUTTON_LEFT);
+	/// A row's cells joined into one line.
+	std::string rowText(TextList *list, size_t row);
+	/// A node for a list row: its cells as the label; Enter left-clicks it if the list is selectable.
+	Graph::NodeVtable listRow(State *state, TextList *list, size_t row);
 	/// A node for a text button: its visible text as the label, Enter clicks it.
 	Graph::NodeVtable textButton(State *state, TextButton *button);
 	/// A node for a button without text of its own (an image button): the given label, Enter clicks it.

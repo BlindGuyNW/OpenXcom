@@ -25,9 +25,16 @@
 #include "../Interface/Frame.h"
 #include "../Interface/Slider.h"
 #include "../Interface/Text.h"
+#include "../Interface/TextEdit.h"
+#include "../Interface/TextList.h"
 #include "../Interface/TextButton.h"
 #include "../Menu/MainMenuState.h"
 #include "../Menu/NewBattleState.h"
+#include "../Basescape/CraftArmorState.h"
+#include "../Basescape/CraftEquipmentState.h"
+#include "../Basescape/CraftInfoState.h"
+#include "../Basescape/CraftSoldiersState.h"
+#include "../Basescape/SoldierArmorState.h"
 #include "../Battlescape/BriefingState.h"
 #include "../Battlescape/InventoryState.h"
 #include "../Battlescape/NextTurnState.h"
@@ -62,21 +69,26 @@ std::string firstText(State *state)
 /// For screens that are just something to read.
 std::string allText(State *state)
 {
-	std::vector<Text *> texts;
+	// Text edits count too: some screens' titles are editable names.
+	std::vector<std::pair<Surface *, std::string> > texts;
 	for (Surface *s : state->getSurfaces())
 	{
-		Text *text = dynamic_cast<Text *>(s);
-		if (text && text->getVisible() && !text->getText().empty())
-			texts.push_back(text);
+		std::string line;
+		if (Text *text = dynamic_cast<Text *>(s))
+			line = text->getText();
+		else if (TextEdit *edit = dynamic_cast<TextEdit *>(s))
+			line = edit->getText();
+		if (s->getVisible() && !line.empty())
+			texts.push_back(std::make_pair(s, line));
 	}
-	std::stable_sort(texts.begin(), texts.end(), [](Text *a, Text *b)
+	std::stable_sort(texts.begin(), texts.end(), [](const std::pair<Surface *, std::string> &a, const std::pair<Surface *, std::string> &b)
 	{
-		return std::make_pair(a->getY(), a->getX()) < std::make_pair(b->getY(), b->getX());
+		return std::make_pair(a.first->getY(), a.first->getX()) < std::make_pair(b.first->getY(), b.first->getX());
 	});
 	std::string result;
-	for (Text *text : texts)
+	for (const std::pair<Surface *, std::string> &text : texts)
 	{
-		std::string line = text->getText();
+		const std::string &line = text.second;
 		if (!result.empty())
 			result += " ";
 		result += line;
@@ -136,10 +148,14 @@ std::string labelFor(State *state, Surface *target, bool sameRow = true)
 	return left ? left->getText() : above ? above->getText() : "";
 }
 
-/// Adds every visible button, combo box and slider of a state as a vertical list in reading order:
+/// Lets a screen add behaviour to its list rows, such as Left/Right on an equipment list.
+typedef std::function<void(TextList *, size_t, NodeVtable &)> RowCustomizer;
+
+/// Adds every visible button, combo box, slider and list of a state as a vertical list in reading order:
 /// top to bottom, with each frame's controls together under the frame's heading.
+/// A list's rows sit together at the list's position, under a "list" heading.
 /// Keys are the widgets' indices among the state's elements, which only change if the state's code does.
-void addWidgets(GraphBuilder &b, State *state)
+void addWidgets(GraphBuilder &b, State *state, const RowCustomizer &customize)
 {
 	struct Widget
 	{
@@ -158,7 +174,7 @@ void addWidgets(GraphBuilder &b, State *state)
 	for (size_t i = 0; i < surfaces.size(); ++i)
 	{
 		Surface *s = surfaces[i];
-		if (s->getVisible() && (dynamic_cast<TextButton *>(s) || dynamic_cast<ComboBox *>(s) || dynamic_cast<Slider *>(s)))
+		if (s->getVisible() && (dynamic_cast<TextButton *>(s) || dynamic_cast<ComboBox *>(s) || dynamic_cast<Slider *>(s) || dynamic_cast<TextList *>(s)))
 			widgets.push_back(Widget{ i, s, frameFor(state, s) });
 	}
 	std::stable_sort(widgets.begin(), widgets.end(), [](const Widget &a, const Widget &b) { return a.order() < b.order(); });
@@ -181,9 +197,45 @@ void addWidgets(GraphBuilder &b, State *state)
 			b.AddItem(id, Controls::comboBox(state, box, labelFor(state, box)));
 		else if (Slider *slider = dynamic_cast<Slider *>(w.surface))
 			b.AddItem(id, Controls::slider(state, slider, labelFor(state, slider)));
+		else if (TextList *list = dynamic_cast<TextList *>(w.surface))
+		{
+			if (list->getTexts() == 0)
+				continue;
+			b.PushContext(Vocab::get(Vocab::LIST));
+			for (size_t row = 0; row < list->getTexts(); ++row)
+			{
+				NodeVtable v = Controls::listRow(state, list, row);
+				if (customize)
+					customize(list, row, v);
+				b.AddItem(ControlId::Referenced(list, "widget:" + std::to_string(w.index) + ":row:" + std::to_string(row)), v);
+			}
+			b.PopContext();
+		}
 	}
 	if (context)
 		b.PopContext();
+}
+
+void addWidgets(GraphBuilder &b, State *state)
+{
+	addWidgets(b, state, RowCustomizer());
+}
+
+/// A screen that reads all its text on arrival and lists its widgets.
+AccessScreen simpleScreen(const std::string &key, std::function<bool(State *)> isActive)
+{
+	AccessScreen s;
+	s.key = key;
+	s.isActive = isActive;
+	s.name = allText;
+	s.build = [](GraphBuilder &b, State *state) { addWidgets(b, state); };
+	return s;
+}
+
+template <typename T>
+bool is(State *state)
+{
+	return dynamic_cast<T *>(state) != nullptr;
 }
 
 AccessScreen mainMenu()
@@ -192,7 +244,7 @@ AccessScreen mainMenu()
 	s.key = "mainMenu";
 	s.isActive = [](State *state) { return dynamic_cast<MainMenuState *>(state) != nullptr; };
 	s.name = firstText;
-	s.build = addWidgets;
+	s.build = [](GraphBuilder &b, State *state) { addWidgets(b, state); };
 	return s;
 }
 
@@ -202,7 +254,7 @@ AccessScreen newBattle()
 	s.key = "newBattle";
 	s.isActive = [](State *state) { return dynamic_cast<NewBattleState *>(state) != nullptr; };
 	s.name = firstText;
-	s.build = addWidgets;
+	s.build = [](GraphBuilder &b, State *state) { addWidgets(b, state); };
 	return s;
 }
 
@@ -212,7 +264,7 @@ AccessScreen briefing()
 	s.key = "briefing";
 	s.isActive = [](State *state) { return dynamic_cast<BriefingState *>(state) != nullptr; };
 	s.name = allText;
-	s.build = addWidgets;
+	s.build = [](GraphBuilder &b, State *state) { addWidgets(b, state); };
 	return s;
 }
 
@@ -263,11 +315,43 @@ AccessScreen nextTurn()
 	return s;
 }
 
+/// Moving items between the base's stores and the craft: Left/Right on a row, Shift for five.
+AccessScreen craftEquipment()
+{
+	AccessScreen s = simpleScreen("craftEquipment", is<CraftEquipmentState>);
+	s.build = [](GraphBuilder &b, State *state)
+	{
+		addWidgets(b, state, [state](TextList *list, size_t row, NodeVtable &v)
+		{
+			v.OnAdjust = [state, list, row](int sign, bool large)
+			{
+				// A left press on the row is how the screen learns which item the arrows act on.
+				Controls::clickRow(state, list, row);
+				CraftEquipmentState *equip = static_cast<CraftEquipmentState *>(state);
+				int count = large ? 5 : 1;
+				if (sign < 0)
+					equip->moveLeftByValue(count);
+				else
+					equip->moveRightByValue(count);
+			};
+			v.StateText = [list, row] { return Controls::rowText(list, row); };
+		});
+	};
+	return s;
+}
+
 }
 
 const std::vector<AccessScreen> &all()
 {
-	static const std::vector<AccessScreen> screens = { mainMenu(), newBattle(), briefing(), inventory(), nextTurn() };
+	static const std::vector<AccessScreen> screens = {
+		mainMenu(), newBattle(), briefing(), inventory(), nextTurn(),
+		simpleScreen("craftInfo", is<CraftInfoState>),
+		simpleScreen("craftSoldiers", is<CraftSoldiersState>),
+		craftEquipment(),
+		simpleScreen("craftArmor", is<CraftArmorState>),
+		simpleScreen("soldierArmor", is<SoldierArmorState>),
+	};
 	return screens;
 }
 

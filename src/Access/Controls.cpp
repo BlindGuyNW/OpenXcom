@@ -24,6 +24,7 @@
 #include "../Engine/State.h"
 #include "../Interface/ComboBox.h"
 #include "../Interface/Slider.h"
+#include "../Interface/TextList.h"
 #include "../Interface/TextButton.h"
 
 namespace OpenXcom
@@ -72,21 +73,62 @@ const ControlType &sliderType()
 	return type;
 }
 
+namespace
+{
+	/// A synthetic click at a screen point, so handlers that read the
+	/// button or the mouse position see what a real click would give them.
+	void clickAt(State *state, InteractiveSurface *surface, Uint8 mouseButton, int x, int y)
+	{
+		SDL_Event ev = {};
+		ev.type = SDL_MOUSEBUTTONUP;
+		ev.button.button = mouseButton;
+		ev.button.x = x;
+		ev.button.y = y;
+		Action action(&ev, 1.0, 1.0, 0, 0);
+		action.setSender(surface);
+		action.setMouseAction(ev.button.x, ev.button.y, surface->getX(), surface->getY());
+		surface->mousePress(&action, state);
+		surface->mouseRelease(&action, state);
+		surface->mouseClick(&action, state);
+	}
+}
+
 void click(State *state, InteractiveSurface *surface, Uint8 mouseButton)
 {
-	// A synthetic event at the surface's centre, so handlers that read the
-	// button or the mouse position see what a real click would give them.
-	SDL_Event ev = {};
-	ev.type = SDL_MOUSEBUTTONUP;
-	ev.button.button = mouseButton;
-	ev.button.x = surface->getX() + surface->getWidth() / 2;
-	ev.button.y = surface->getY() + surface->getHeight() / 2;
-	Action action(&ev, 1.0, 1.0, 0, 0);
-	action.setSender(surface);
-	action.setMouseAction(ev.button.x, ev.button.y, surface->getX(), surface->getY());
-	surface->mousePress(&action, state);
-	surface->mouseRelease(&action, state);
-	surface->mouseClick(&action, state);
+	clickAt(state, surface, mouseButton, surface->getX() + surface->getWidth() / 2, surface->getY() + surface->getHeight() / 2);
+}
+
+void clickRow(State *state, TextList *list, size_t row, Uint8 mouseButton)
+{
+	list->setSelectedRow(row);
+	clickAt(state, list, mouseButton, list->getX() + 2, list->getY() + 2);
+}
+
+std::string rowText(TextList *list, size_t row)
+{
+	std::string text;
+	for (size_t i = 0; i < list->getCellCount(row); ++i)
+	{
+		std::string cell = list->getCellText(row, i);
+		if (cell.empty())
+			continue;
+		if (!text.empty())
+			text += ", ";
+		text += cell;
+	}
+	return text;
+}
+
+NodeVtable listRow(State *state, TextList *list, size_t row)
+{
+	NodeVtable v;
+	v.Announcements.push_back(NodeAnnouncement([list, row] { return rowText(list, row); }, false, AnnouncementKinds::Label));
+	if (list->isSelectable())
+	{
+		v.OnActivate = [state, list, row] { clickRow(state, list, row); };
+		v.StateText = [list, row] { return rowText(list, row); };
+	}
+	return v;
 }
 
 NodeVtable textButton(State *state, TextButton *btn)

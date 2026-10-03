@@ -182,6 +182,34 @@ std::string TextList::getCellText(size_t row, size_t column) const
 }
 
 /**
+ * Returns how many cells a row has.
+ * @param row Row number.
+ * @return Cell count.
+ */
+size_t TextList::getCellCount(size_t row) const
+{
+	return row < _texts.size() ? _texts[row].size() : 0;
+}
+
+/**
+ * Selects a text row the way hovering the mouse over it does,
+ * so click handlers that read getSelectedRow() act on it.
+ * Does nothing if the row doesn't exist.
+ * @param row Text row number.
+ */
+void TextList::setSelectedRow(size_t row)
+{
+	for (size_t i = 0; i < _rows.size(); ++i)
+	{
+		if (_rows[i] == row)
+		{
+			_selRow = i;
+			return;
+		}
+	}
+}
+
+/**
  * Changes the text of a specific Text object in the list.
  * @param row Row number.
  * @param column Column number.
@@ -618,6 +646,15 @@ void TextList::setDot(bool dot)
 void TextList::setSelectable(bool selectable)
 {
 	_selectable = selectable;
+}
+
+/**
+ * Returns whether the rows can be selected and clicked.
+ * @return Selectable?
+ */
+bool TextList::isSelectable() const
+{
+	return _selectable;
 }
 
 /**
