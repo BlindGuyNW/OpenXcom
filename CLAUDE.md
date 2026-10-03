@@ -63,9 +63,13 @@ The design follows the Graph A11y Kernel spec at `C:\git\sims2access\docs\graph-
 - `src/Access/Vocab.{h,cpp}`: the `Vocab::Id` enum plus a string table. Keep the two in the same order. `Vocab::format` fills `{0}`, `{1}` placeholders.
 - `src/Access/Graph/`: the graph kernel, copied verbatim from sims2access (deltas: the namespace is `OpenXcom::Graph`, and one C++20 `std::erase_if` is spelled the C++17 way). STL-only, no game headers. Don't edit it for OpenXcom-specific needs; fix upstream and re-copy.
 - `tests/graph/`: the kernel conformance suite. Run `tests/graph/build.cmd` (needs C++20, so it builds outside the game; output in `build/graphtests/`).
-- `src/Access/Navigator.{h,cpp}`: screen manager plus navigator. Each frame it matches the top `State` against the recipes (poll and diff), keeps a `GraphState` per live `State` so covered screens restore focus, and runs the announce-once differ. `handleEvent` is called from `Game::run` before the game sees an event; it swallows claimed key-downs and their key-ups. It stands down while a `TextEdit` is focused.
+- `src/Access/Navigator.{h,cpp}`: screen manager plus navigator. Each frame it matches the top `State` against the recipes (poll and diff), keeps a `GraphState` per live `State` so covered screens restore focus, and runs the announce-once differ. `handleEvent` is called from `Game::run` before the game sees an event; it swallows claimed key-downs and their key-ups. It stands down while a `TextEdit` is focused, and skips frames until the top state has run `init()` (`Game::isStateInitialized`); many states set up widgets there, so reading earlier announces half-built screens.
 - `src/Access/Screens.{h,cpp}`: the `AccessScreen` recipes (`isActive`, `build`, `name`, `back`) and the registry. Recipes read widgets through `State::getSurfaces()`, so most don't need access to private members.
-- `src/Access/Controls.{h,cpp}`: the one `ControlType` registry and drive helpers. `Controls::click` runs a surface's own press/release/click handlers with a synthetic left click, so sounds and side effects match the mouse.
+  - `addWidgets` lists the buttons, combo boxes, sliders and list rows in reading order; a `Customizer` lets a recipe change one widget's node. `simpleScreen` = speak `allText` on arrival + `addWidgets`. `addTextLines` makes one item per screen line (label + value).
+  - **These rely on layout heuristics**: `labelFor` (text left on the same row in the same frame, else just above), frame grouping by containment, sort by Y then X, line grouping by exact Y, and a few buttons found by their text (`<<`, translated OK). The user distrusts them. Say so when a new screen relies on them, and switch a screen to explicit wiring (accessors or `friend`) if it mislabels or matters a lot.
+  - Screens so far: main menu, New Battle (OK speaks a warning if it fails because the craft is empty), briefing, battle inventory (OK/prev/next only), next turn, craft info, crew, equipment (Left/Right move items), armor, armor picker, soldier info.
+- `src/Access/Controls.{h,cpp}`: the one `ControlType` registry and drive helpers. `Controls::click` runs a surface's own press/release/click handlers with a synthetic left click, so sounds and side effects match the mouse. `clickRow` selects a `TextList` row the way hovering would, then clicks it, because the game's list handlers read `getSelectedRow()`. Selectable list rows get Enter as left click and Backspace as right click.
+- Widget accessors added for the layer: `ComboBox` (`getOptionCount`, `getSelectedText`, `notifyChange`), `Slider` (`getMin`, `getMax`, `notifyChange`), `TextList` (`setSelectedRow`, `getCellCount`, `isSelectable`). `notifyChange` runs the change handler with a null action.
 - `src/main.cpp`: `Speech::init()` and `Navigator::init()` after `Options::init`, and `Speech::shutdown()` on exit.
 
 ### Keys
@@ -89,7 +93,7 @@ The design follows the Graph A11y Kernel spec at `C:\git\sims2access\docs\graph-
 
 1. ~~Speech wrapper, text cleanup, transcript, vocabulary module, C++17~~ (done)
 2. ~~Graph kernel, navigator, key filter in `Game::run`, screen manager over the `State` stack; prove it on the main menu~~ (done)
-3. New Battle setup screen
+3. ~~New Battle setup screen, Equip Craft (crew, equipment, armor, soldier info), briefing, next turn~~ (done)
 4. Map exploration layer: tile cursor, confirm via `primaryAction`, selection/cursor differ, parity gating
 5. Action menu, unit and enemy list overlays, event narration
 6. Inventory
