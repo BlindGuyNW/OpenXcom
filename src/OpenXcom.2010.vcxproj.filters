@@ -936,6 +936,12 @@
     <ClCompile Include="Menu\SetWindowedRootState.cpp">
       <Filter>Menu</Filter>
     </ClCompile>
+    <ClCompile Include="Access\Speech.cpp">
+      <Filter>Access</Filter>
+    </ClCompile>
+    <ClCompile Include="Access\Vocab.cpp">
+      <Filter>Access</Filter>
+    </ClCompile>
     <ClCompile Include="Engine\Unicode.cpp">
       <Filter>Engine</Filter>
     </ClCompile>
@@ -1924,6 +1930,12 @@
     <ClInclude Include="Menu\SetWindowedRootState.h">
       <Filter>Menu</Filter>
     </ClInclude>
+    <ClInclude Include="Access\Speech.h">
+      <Filter>Access</Filter>
+    </ClInclude>
+    <ClInclude Include="Access\Vocab.h">
+      <Filter>Access</Filter>
+    </ClInclude>
     <ClInclude Include="Engine\Unicode.h">
       <Filter>Engine</Filter>
     </ClInclude>
@@ -1940,6 +1952,9 @@
   <ItemGroup>
     <Filter Include="Geoscape">
       <UniqueIdentifier>{f0521223-4515-4155-bf25-5f00373167d5}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Access">
+      <UniqueIdentifier>{5d3c8e1a-7b42-4f0e-9a6d-2c1b8f4e7a90}</UniqueIdentifier>
     </Filter>
     <Filter Include="Engine">
       <UniqueIdentifier>{8fafa8d9-0283-4082-9361-01ebd937e3bb}</UniqueIdentifier>

@@ -1,0 +1,89 @@
+# OpenXcom screen reader fork
+
+A personal accessibility fork of OpenXcom (vanilla, SDL 1.2) for playing with a screen reader through Tolk on Windows. There's one target user, so favour minimum viable over generality. Upstream submission isn't planned.
+
+## Scope
+
+- v1 is the **tactical layer** (Battlescape) plus the menus needed to reach it: main menu → New Battle (`Menu/NewBattleState`). The Geoscape and base building are out of scope until asked for.
+- Repurposing keys or degrading the sighted/mouse UX is fine when it's needed.
+- Windows only for speech. Other platforms may compile, but speech is a no-op there.
+
+## Building
+
+Visual Studio 2022 is installed; build `src/OpenXcom.2010.sln` with MSBuild (the solution is the primary build, CMake is kept in sync but secondary):
+
+```
+"C:/Program Files/Microsoft Visual Studio/2022/Community/MSBuild/Current/Bin/MSBuild.exe" src/OpenXcom.2010.sln -p:Configuration=Release -p:Platform=x64 -m -v:minimal -nologo
+```
+
+- A full rebuild takes several minutes; run it in the background.
+- Output: `bin/x64/Release/OpenXcom.exe`. The post-build step copies every DLL in `deps/lib/<platform>/` to `bin/<platform>/` (one level above the exe).
+- C++17, with `_HAS_AUTO_PTR_ETC=1` defined because the codebase still uses `std::unary_function`/`binary_function`, which MSVC drops in C++17.
+- The log is full of yaml-cpp C4251/C4275 and conversion warnings from upstream code; only look at warnings in files you touched.
+
+### Adding a source file
+
+Add it in **three** places: `src/OpenXcom.2010.vcxproj` (ClCompile/ClInclude), `src/OpenXcom.2010.vcxproj.filters` (with a `<Filter>`), and `src/CMakeLists.txt` (the matching `*_src` list).
+
+### File format gotchas
+
+- Source files are checked out with **CRLF**; the `.vcxproj` and `.filters` files are also UTF-8 **with BOM**. Preserve both.
+- **Don't use `sed -i` from Git Bash on these files**: it silently strips the CRs and the pattern then fails to match. Use the Edit tool, or a Python script that reads/writes bytes.
+- Backslashes in heredoc'd Python get mangled through the Bash tool; write such scripts to a file first.
+
+## Running
+
+- Original game data lives in `bin/UFO/` (GEODATA, GEOGRAPH, MAPS, ROUTES, SOUND, TERRAIN, UFOGRAPH, UFOINTRO, UNITS), copied from the Steam install at `C:\Program Files (x86)\Steam\steamapps\common\XCom UFO Defense\XCOM`. It's gitignored.
+- Launch from `bin/x64`: `./Release/OpenXcom.exe -data ../`
+- User/config folder, `openxcom.log` and `speech.log`: `C:\Users\zklin\OneDrive\Documents\OpenXcom\`.
+- **`speech.log` is the main debugging tool**: a timestamped transcript of everything sent to the screen reader (`I` = interrupting, `Q` = queued, `!` = backend status, `-` = silence).
+
+## Tolk
+
+- Loaded at runtime (`LoadLibraryExW` + `GetProcAddress`), so there's no header or import lib; a missing DLL means silence, not a crash. It tries the exe folder, then its parent, then the normal search order.
+- DLLs in `deps/lib/x64/` (Tolk, nvdaControllerClient64, SAAPI64) and `deps/lib/Win32/`. They're **not tracked by git** (`*.dll` is ignored, same as SDL). Sources: `C:\git\glfrontier-extended\tolk\x64\` and `C:\git\dangerous-access\libs\tolk\` (32-bit).
+- SAPI is enabled as a fallback, so if NVDA isn't running at launch, speech goes to SAPI.
+
+## Accessibility architecture
+
+The design follows the Graph A11y Kernel spec at `C:\git\sims2access\docs\graph-a11y-spec.md`. Read it before building navigation or screens.
+
+- **Menus and popups** become graph screens: an immediate-mode parallel UI tree rebuilt from live game state on each operation. The plan is to reuse the C++ kernel from `C:\git\sims2access\src\Graph\` (with tests in `tests\graph\`).
+- **The battle map is not a graph.** It's a separate exploration layer (keyboard tile cursor) that's active only when no graph screen claims the keyboard.
+- Axioms to follow everywhere:
+  - **Announce once:** a differ over the focused identity (for example the selected unit or cursor tile), not hand-placed announce calls.
+  - **Parity:** never reveal what a sighted player can't see. Gate on `Tile::isDiscovered` and visible-unit lists.
+  - **Interrupt by provenance:** responses to the player's keypresses interrupt; event narration queues.
+  - **One vocabulary module:** every string the mod authors goes through `Access/Vocab`. Game text is already localized and is passed through as is.
+  - **Drive the game's own handlers** rather than reimplementing flows. Many `ActionHandler`s ignore their `Action*` argument, so call them with null.
+
+### Code layout
+
+- `src/Access/Speech.{h,cpp}`: `Speech::say(text, interrupt)`, `silence()`, `repeatLast()`, `normalize()`. `normalize` strips `TOK_COLOR_FLIP`, `TOK_NL_SMALL`, newlines and NBSP and collapses whitespace. Output is split into chunks of at most 700 bytes. Main thread only.
+- `src/Access/Vocab.{h,cpp}`: the `Vocab::Id` enum plus a string table. Keep the two in the same order.
+- `src/main.cpp`: `Speech::init()` after `Options::init`, and `Speech::shutdown()` on exit.
+
+### Key hook points (tactical)
+
+- Main loop and global keys: `Engine/Game.cpp` `Game::run`. The SDL event poll is where to filter keys the layer claims, before `_states.back()->handle()`.
+- Screen stack: `Game::pushState`/`popState`. A screen recipe's `IsActive` is a `dynamic_cast` on the top state.
+- Battlescape input: `BattlescapeState::handle`. It ignores input while the cursor is hidden. Bindings are in `Engine/Options.inc.h`; the arrow keys belong to `Camera::keyboardPress`.
+- Tile cursor: `Map::setSelectorPosition` takes screen pixels, so add a map-coordinate setter. `BattlescapeGame::primaryAction(Position)` and `secondaryAction(Position)` are what a click does.
+- Path cost: `Pathfinding::calculate` and `getTotalTUCost`. Hit chance: `BattleUnit::getFiringAccuracy`.
+- Newly spotted units: `BattleUnit::addToVisibleUnits` returns true on first sight.
+- Events: the `BattleState` subclasses (`UnitWalkBState`, `ProjectileFlyBState`, `ExplosionBState`, `UnitDieBState`, and so on), plus `BattlescapeGame::checkForCasualties` and `endTurn`.
+- Warnings: `BattlescapeState::warning`. Selection changes: `BattlescapeState::updateSoldierInfo`.
+
+## Roadmap
+
+1. ~~Speech wrapper, text cleanup, transcript, vocabulary module, C++17~~ (done)
+2. Graph kernel, navigator, key filter in `Game::run`, screen manager over the `State` stack; prove it on the main menu
+3. New Battle setup screen
+4. Map exploration layer: tile cursor, confirm via `primaryAction`, selection/cursor differ, parity gating
+5. Action menu, unit and enemy list overlays, event narration
+6. Inventory
+
+## Git
+
+- Work on the `accessibility` branch. `master` tracks upstream. Remotes: `origin` is the user's fork (BlindGuyNW/OpenXcom) and `upstream` is OpenXcom/OpenXcom.
+- Commit as work lands. An earlier attempt at this fork was lost because it was never committed.

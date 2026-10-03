@@ -3,6 +3,11 @@ set ( root_src
   main.cpp
 )
 
+set ( access_src
+  Access/Speech.cpp
+  Access/Vocab.cpp
+)
+
 set ( basescape_src
   Basescape/BaseInfoState.cpp
   Basescape/BaseView.cpp
@@ -407,6 +412,8 @@ if ( CMAKE_CXX_COMPILER_ID MATCHES "Clang" )
 endif ()
 
 if ( MSVC )
+  # MSVC drops std::unary_function/binary_function in C++17 mode; the codebase still uses them
+  add_definitions( -D_HAS_AUTO_PTR_ETC=1 )
   if ( ENABLE_WARNING )
     add_compile_options ( /W${MSVC_WARNING_LEVEL} )
   else ()
@@ -427,7 +434,7 @@ if ( WIN32 )
   set ( openxcom_icon OpenXcom.rc )
 endif ()
 
-set ( openxcom_src ${root_src} ${basescape_src} ${battlescape_src} ${engine_src} ${geoscape_src} ${interface_src} ${menu_src} ${mod_src} ${savegame_src} ${ufopedia_src} )
+set ( openxcom_src ${root_src} ${access_src} ${basescape_src} ${battlescape_src} ${engine_src} ${geoscape_src} ${interface_src} ${menu_src} ${mod_src} ${savegame_src} ${ufopedia_src} )
 
 set ( install_dest RUNTIME )
 set ( set_exec_path ON )
@@ -535,6 +542,7 @@ endif ()
 
 #Setup source groups for IDE
 if ( MSVC OR "${CMAKE_GENERATOR}" STREQUAL "Xcode" )
+  source_group ( "Access" FILES ${access_src} )
   source_group ( "Basescape" FILES ${basescape_src} )
   source_group ( "Battlescape" FILES ${battlescape_src} )
   source_group ( "Engine" FILES ${engine_src} )

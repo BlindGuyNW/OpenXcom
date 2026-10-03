@@ -23,6 +23,8 @@
 #include "Engine/Game.h"
 #include "Engine/Options.h"
 #include "Menu/StartState.h"
+#include "Access/Speech.h"
+#include "Access/Vocab.h"
 
 /** @mainpage
  * @author OpenXcom Developers
@@ -112,6 +114,8 @@ int main(int argc, char *argv[])
 	title << "OpenXcom " << OPENXCOM_VERSION_SHORT << OPENXCOM_VERSION_GIT;
 	if (Options::verboseLogging)
 		Logger::reportingLevel() = LOG_VERBOSE;
+	Speech::init();
+	Speech::say(Vocab::get(Vocab::STARTUP), false);
 	Options::baseXResolution = Options::displayWidth;
 	Options::baseYResolution = Options::displayHeight;
 
@@ -122,6 +126,7 @@ int main(int argc, char *argv[])
 
 	// Comment this for faster exit.
 	delete game;
+	Speech::shutdown();
 	return EXIT_SUCCESS;
 }
 

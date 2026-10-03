@@ -6,9 +6,9 @@ set ( CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake/modules" )
 include(BuildType)
 include(GNUInstallDirs)
 
-# For yaml-cpp
-set (CMAKE_CXX_STANDARD 11)
-# use std=c++11 rather than std=gnu++11
+# C++17 for the accessibility graph kernel (std::optional, std::any)
+set (CMAKE_CXX_STANDARD 17)
+# use std=c++17 rather than std=gnu++17
 set (CMAKE_CXX_EXTENSIONS OFF)
 
 option ( DEV_BUILD "Development Build. Disable this for release builds" ON )
