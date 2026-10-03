@@ -34,7 +34,7 @@ Add it in **three** places: `src/OpenXcom.2010.vcxproj` (ClCompile/ClInclude), `
 ## Running
 
 - Original game data lives in `bin/UFO/` (GEODATA, GEOGRAPH, MAPS, ROUTES, SOUND, TERRAIN, UFOGRAPH, UFOINTRO, UNITS), copied from the Steam install at `C:\Program Files (x86)\Steam\steamapps\common\XCom UFO Defense\XCOM`. It's gitignored.
-- Launch from `bin/x64`: `./Release/OpenXcom.exe -data ../`
+- Launch with `run.cmd` at the repo root (double-clickable), or from `bin/x64`: `./Release/OpenXcom.exe -data ../`
 - User/config folder, `openxcom.log` and `speech.log`: `C:\Users\zklin\OneDrive\Documents\OpenXcom\`.
 - **`speech.log` is the main debugging tool**: a timestamped transcript of everything sent to the screen reader (`I` = interrupting, `Q` = queued, `!` = backend status, `-` = silence).
 
