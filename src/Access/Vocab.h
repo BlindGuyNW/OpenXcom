@@ -95,6 +95,7 @@ namespace Vocab
 		TIME_UNITS_LEFT,
 		SPOTTED,
 		NO_SOLDIER,
+		NO_FLOOR_BELOW,
 		COUNT
 	};
 

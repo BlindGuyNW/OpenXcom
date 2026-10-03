@@ -92,6 +92,7 @@ namespace
 		"{0} time units left",
 		"{0} spotted, {1}",
 		"No soldier selected",
+		"no floor, {0} below: {1}",
 	};
 }
 

@@ -273,13 +273,24 @@ namespace
 			parts.push_back(Vocab::get(Vocab::LIFT));
 		if (floor && floor->getSpecialType() == END_POINT)
 			parts.push_back(Vocab::get(Vocab::EXIT_AREA));
-		if (p.z > 0 && tile->hasNoFloor(save->getTile(p + Position(0, 0, -1))))
-			parts.push_back(Vocab::get(Vocab::NO_FLOOR));
 		if (tile->getSmoke())
 			parts.push_back(Vocab::get(Vocab::SMOKE));
 		if (tile->getFire())
 			parts.push_back(Vocab::get(Vocab::FIRE));
 		return parts;
+	}
+
+	/// Where a fall from p would land, the way Pathfinding::calculate settles a click
+	/// on open air. Stops above tiles not yet seen, so it never describes hidden ground.
+	Position settleDown(SavedBattleGame *save, Position p)
+	{
+		for (;;)
+		{
+			Tile *below = save->getTile(p + Position(0, 0, -1));
+			if (!below || !below->isDiscovered(2) || !save->getTile(p)->hasNoFloor(below))
+				return p;
+			p.z--;
+		}
 	}
 
 	/// What a sighted player sees on a tile. Brief is for cursor steps, full for Ctrl+L.
@@ -307,6 +318,16 @@ namespace
 		for (const std::string &s : terrainParts(save, tile, p, full))
 			parts.push_back(s);
 		parts.push_back(edgesText(save, tile, p));
+
+		// Open air: say what you'd land on, so the cursor can stay on the level you picked.
+		if (p.z > 0 && tile->hasNoFloor(save->getTile(p + Position(0, 0, -1))))
+		{
+			Position ground = settleDown(save, p);
+			if (ground.z < p.z)
+				parts.push_back(Vocab::format(Vocab::NO_FLOOR_BELOW, { num(p.z - ground.z), describeTile(state, ground, full) }));
+			else
+				parts.push_back(Vocab::get(Vocab::NO_FLOOR));
+		}
 
 		std::string text = joinComma(parts);
 		return text.empty() ? Vocab::get(Vocab::EMPTY_TILE) : text;
@@ -354,36 +375,12 @@ namespace
 		map->setSelectorTile(_cursor);
 	}
 
-	/// Settles a position onto the walkable surface the way Pathfinding::calculate settles a click:
-	/// down through tiles with no floor, up off a full-height step. Only onto tiles already seen.
-	Position settle(SavedBattleGame *save, Position p)
-	{
-		for (;;)
-		{
-			Tile *tile = save->getTile(p);
-			Tile *below = save->getTile(p + Position(0, 0, -1));
-			Tile *above = save->getTile(p + Position(0, 0, 1));
-			if (below && below->isDiscovered(2) && tile->hasNoFloor(below))
-				p.z--;
-			else if (above && above->isDiscovered(2) && tile->getTerrainLevel() == -24)
-				p.z++;
-			else
-				return p;
-		}
-	}
-
 	void moveCursor(BattlescapeState *state, Position to, bool levelChange)
 	{
-		SavedBattleGame *save = saveOf(state);
-		if (!save->getTile(to))
+		if (!saveOf(state)->getTile(to))
 		{
 			say(Vocab::get(Vocab::MAP_EDGE), true);
 			return;
-		}
-		if (!levelChange)
-		{
-			to = settle(save, to);
-			levelChange = to.z != _cursor.z;
 		}
 		_cursor = to;
 		showCursor(state);
