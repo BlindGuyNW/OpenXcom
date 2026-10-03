@@ -148,14 +148,16 @@ std::string labelFor(State *state, Surface *target, bool sameRow = true)
 	return left ? left->getText() : above ? above->getText() : "";
 }
 
-/// Lets a screen add behaviour to its list rows, such as Left/Right on an equipment list.
-typedef std::function<void(TextList *, size_t, NodeVtable &)> RowCustomizer;
+/// Lets a screen add behaviour to its widgets, such as Left/Right on an equipment list.
+/// Gets the widget, the row for a list row (NO_ROW otherwise) and the node to change.
+typedef std::function<void(Surface *, size_t, NodeVtable &)> Customizer;
+const size_t NO_ROW = (size_t)-1;
 
 /// Adds every visible button, combo box, slider and list of a state as a vertical list in reading order:
 /// top to bottom, with each frame's controls together under the frame's heading.
 /// A list's rows sit together at the list's position, under a "list" heading.
 /// Keys are the widgets' indices among the state's elements, which only change if the state's code does.
-void addWidgets(GraphBuilder &b, State *state, const RowCustomizer &customize)
+void addWidgets(GraphBuilder &b, State *state, const Customizer &customize)
 {
 	struct Widget
 	{
@@ -191,12 +193,19 @@ void addWidgets(GraphBuilder &b, State *state, const RowCustomizer &customize)
 				b.PushContext(labelFor(state, context, false));
 		}
 		ControlId id = ControlId::Referenced(w.surface, "widget:" + std::to_string(w.index));
+		NodeVtable v;
 		if (TextButton *btn = dynamic_cast<TextButton *>(w.surface))
-			b.AddItem(id, Controls::textButton(state, btn));
+			v = Controls::textButton(state, btn);
 		else if (ComboBox *box = dynamic_cast<ComboBox *>(w.surface))
-			b.AddItem(id, Controls::comboBox(state, box, labelFor(state, box)));
+			v = Controls::comboBox(state, box, labelFor(state, box));
 		else if (Slider *slider = dynamic_cast<Slider *>(w.surface))
-			b.AddItem(id, Controls::slider(state, slider, labelFor(state, slider)));
+			v = Controls::slider(state, slider, labelFor(state, slider));
+		if (!v.Announcements.empty())
+		{
+			if (customize)
+				customize(w.surface, NO_ROW, v);
+			b.AddItem(id, v);
+		}
 		else if (TextList *list = dynamic_cast<TextList *>(w.surface))
 		{
 			if (list->getTexts() == 0)
@@ -218,7 +227,7 @@ void addWidgets(GraphBuilder &b, State *state, const RowCustomizer &customize)
 
 void addWidgets(GraphBuilder &b, State *state)
 {
-	addWidgets(b, state, RowCustomizer());
+	addWidgets(b, state, Customizer());
 }
 
 /// A screen that reads all its text on arrival and lists its widgets.
@@ -254,7 +263,17 @@ AccessScreen newBattle()
 	s.key = "newBattle";
 	s.isActive = [](State *state) { return dynamic_cast<NewBattleState *>(state) != nullptr; };
 	s.name = firstText;
-	s.build = [](GraphBuilder &b, State *state) { addWidgets(b, state); };
+	s.build = [](GraphBuilder &b, State *state)
+	{
+		addWidgets(b, state, [state](Surface *surface, size_t, NodeVtable &v)
+		{
+			// The game's OK quietly does nothing when the craft has no one aboard.
+			// The navigator only speaks this if the screen is still up after Enter, which is exactly that case.
+			TextButton *btn = dynamic_cast<TextButton *>(surface);
+			if (btn && btn->getText() == state->tr("STR_OK").operator const std::string &())
+				v.StateText = [] { return Vocab::get(Vocab::NEW_BATTLE_NO_CREW); };
+		});
+	};
 	return s;
 }
 
@@ -321,8 +340,11 @@ AccessScreen craftEquipment()
 	AccessScreen s = simpleScreen("craftEquipment", is<CraftEquipmentState>);
 	s.build = [](GraphBuilder &b, State *state)
 	{
-		addWidgets(b, state, [state](TextList *list, size_t row, NodeVtable &v)
+		addWidgets(b, state, [state](Surface *surface, size_t row, NodeVtable &v)
 		{
+			TextList *list = dynamic_cast<TextList *>(surface);
+			if (!list || row == NO_ROW)
+				return;
 			v.OnAdjust = [state, list, row](int sign, bool large)
 			{
 				// A left press on the row is how the screen learns which item the arrows act on.

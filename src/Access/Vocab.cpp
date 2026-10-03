@@ -39,6 +39,7 @@ namespace
 		"Inventory, {0}",
 		"Continue",
 		"list",
+		"The craft has no soldiers or tanks. Add some under Equip Craft, Crew.",
 	};
 }
 

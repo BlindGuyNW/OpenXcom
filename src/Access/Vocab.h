@@ -42,6 +42,7 @@ namespace Vocab
 		INVENTORY,
 		CONTINUE,
 		LIST,
+		NEW_BATTLE_NO_CREW,
 		COUNT
 	};
 
