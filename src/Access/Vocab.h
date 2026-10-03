@@ -130,6 +130,7 @@ namespace Vocab
 		ABOVE,
 		BELOW,
 		FACING_YOU,
+		DARK,
 		COUNT
 	};
 

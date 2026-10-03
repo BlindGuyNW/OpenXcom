@@ -127,6 +127,7 @@ namespace
 		"above",
 		"below",
 		"facing {0}, toward you",
+		"dark",
 	};
 }
 

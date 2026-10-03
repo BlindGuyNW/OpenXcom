@@ -33,6 +33,7 @@
 #include "../Battlescape/Pathfinding.h"
 #include "../Battlescape/Position.h"
 #include "../Battlescape/Projectile.h"
+#include "../Battlescape/TileEngine.h"
 #include "../Engine/Game.h"
 #include "../Engine/LocalizedText.h"
 #include "../Engine/Options.h"
@@ -355,7 +356,8 @@ namespace
 		parts.push_back(edgesText(save, tile, p));
 
 		// Open air: say what you'd land on, so the cursor can stay on the level you picked.
-		if (p.z > 0 && tile->hasNoFloor(save->getTile(p + Position(0, 0, -1))))
+		bool openAir = p.z > 0 && tile->hasNoFloor(save->getTile(p + Position(0, 0, -1)));
+		if (openAir)
 		{
 			Position ground = settleDown(save, p);
 			if (ground.z < p.z)
@@ -365,7 +367,13 @@ namespace
 		}
 
 		std::string text = joinComma(parts);
-		return text.empty() ? Vocab::get(Vocab::EMPTY_TILE) : text;
+		if (text.empty())
+			text = Vocab::get(Vocab::EMPTY_TILE);
+		// Too dark for our soldiers to spot a unit here from more than 9 tiles away; aliens don't care.
+		// Open air is skipped since the ground below already says it.
+		if (!openAir && tile->getShade() > TileEngine::MAX_DARKNESS_TO_SEE_UNITS)
+			text = joinComma({ text, Vocab::get(Vocab::DARK) });
+		return text;
 	}
 
 	std::string unitSummary(BattlescapeState *state, BattleUnit *unit)
