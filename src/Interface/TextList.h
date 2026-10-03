@@ -127,6 +127,8 @@ public:
 	void setAlign(TextHAlign align, int col = -1);
 	/// Sets whether to separate columns with dots.
 	void setDot(bool dot);
+	/// Does the list fill its cells with dots? (accessibility layer)
+	bool hasDots() const { return _dot; }
 	/// Sets whether the list is selectable.
 	void setSelectable(bool selectable);
 	/// Gets whether the rows are selectable.

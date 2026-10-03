@@ -49,6 +49,8 @@ namespace Controls
 	/// Clicks a list row: selects it as hovering would, then clicks near the row's left edge,
 	/// clear of any arrow column, so the state's handlers see that row.
 	void clickRow(State *state, TextList *list, size_t row, Uint8 mouseButton = SDL_BUTTON_LEFT);
+	/// A cell's text without the dot leaders a dotted list pads its cells with.
+	std::string cellText(TextList *list, size_t row, size_t column);
 	/// A row's cells joined into one line.
 	std::string rowText(TextList *list, size_t row);
 	/// A node for a list row: its cells as the label. If the list is selectable,

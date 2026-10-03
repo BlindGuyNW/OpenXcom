@@ -679,7 +679,7 @@ std::string debriefRow(TextList *list, size_t row)
 {
 	if (list->getCellCount(row) < 3)
 		return Controls::rowText(list, row);
-	return Vocab::format(Vocab::DEBRIEF_ROW, { list->getCellText(row, 0), list->getCellText(row, 1), list->getCellText(row, 2) });
+	return Vocab::format(Vocab::DEBRIEF_ROW, { Controls::cellText(list, row, 0), Controls::cellText(list, row, 1), Controls::cellText(list, row, 2) });
 }
 
 /// A read-only item.
@@ -743,11 +743,11 @@ AccessScreen debriefing()
 					std::vector<std::string> gains;
 					for (size_t i = 0; i < statNames.size() && i + 1 < soldiers->getCellCount(row); ++i)
 					{
-						std::string cell = soldiers->getCellText(row, i + 1);
+						std::string cell = Controls::cellText(soldiers, row, i + 1);
 						if (!cell.empty())
 							gains.push_back(Vocab::format(Vocab::STAT_GAIN, { statNames[i], cell }));
 					}
-					std::string text = soldiers->getCellText(row, 0) + ": ";
+					std::string text = Controls::cellText(soldiers, row, 0) + ": ";
 					if (gains.empty())
 						return text + Vocab::get(Vocab::NO_STAT_GAINS);
 					for (size_t i = 0; i < gains.size(); ++i)

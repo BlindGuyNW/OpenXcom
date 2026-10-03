@@ -104,12 +104,25 @@ void clickRow(State *state, TextList *list, size_t row, Uint8 mouseButton)
 	clickAt(state, list, mouseButton, list->getX() + 2, list->getY() + 2);
 }
 
+std::string cellText(TextList *list, size_t row, size_t column)
+{
+	std::string cell = list->getCellText(row, column);
+	if (!list->hasDots())
+		return cell;
+	// Left-aligned cells get dots after, right-aligned before, centred both.
+	size_t first = cell.find_first_not_of(". ");
+	if (first == std::string::npos)
+		return std::string();
+	size_t last = cell.find_last_not_of(". ");
+	return cell.substr(first, last - first + 1);
+}
+
 std::string rowText(TextList *list, size_t row)
 {
 	std::string text;
 	for (size_t i = 0; i < list->getCellCount(row); ++i)
 	{
-		std::string cell = list->getCellText(row, i);
+		std::string cell = cellText(list, row, i);
 		if (cell.empty())
 			continue;
 		if (!text.empty())
