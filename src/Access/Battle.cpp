@@ -354,12 +354,36 @@ namespace
 		map->setSelectorTile(_cursor);
 	}
 
+	/// Settles a position onto the walkable surface the way Pathfinding::calculate settles a click:
+	/// down through tiles with no floor, up off a full-height step. Only onto tiles already seen.
+	Position settle(SavedBattleGame *save, Position p)
+	{
+		for (;;)
+		{
+			Tile *tile = save->getTile(p);
+			Tile *below = save->getTile(p + Position(0, 0, -1));
+			Tile *above = save->getTile(p + Position(0, 0, 1));
+			if (below && below->isDiscovered(2) && tile->hasNoFloor(below))
+				p.z--;
+			else if (above && above->isDiscovered(2) && tile->getTerrainLevel() == -24)
+				p.z++;
+			else
+				return p;
+		}
+	}
+
 	void moveCursor(BattlescapeState *state, Position to, bool levelChange)
 	{
-		if (!saveOf(state)->getTile(to))
+		SavedBattleGame *save = saveOf(state);
+		if (!save->getTile(to))
 		{
 			say(Vocab::get(Vocab::MAP_EDGE), true);
 			return;
+		}
+		if (!levelChange)
+		{
+			to = settle(save, to);
+			levelChange = to.z != _cursor.z;
 		}
 		_cursor = to;
 		showCursor(state);
