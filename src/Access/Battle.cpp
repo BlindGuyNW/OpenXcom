@@ -861,15 +861,17 @@ namespace
 		return joinComma(parts);
 	}
 
-	/// Someone else's shot or throw just left: say who fired if we can see them,
-	/// else the direction it came from (a sighted player sees the projectile fly in).
-	void incomingShot(BattlescapeState *state, Projectile *projectile)
+	/// A shot or throw the player didn't order just left (an alien's, or our reaction fire):
+	/// say who fired if we can see them, else the direction it came from
+	/// (a sighted player sees the projectile fly in).
+	void narrateShot(BattlescapeState *state, Projectile *projectile)
 	{
 		SavedBattleGame *save = saveOf(state);
+		// The origin is where the trajectory starts, often the tile next to the shooter, so it's only good for a bearing.
 		Position from = projectile->getOrigin(), at = projectile->getTarget();
-		Tile *fromTile = save->getTile(from);
-		BattleUnit *shooter = fromTile ? fromTile->getUnit() : 0;
-		if (shooter && shooter->getFaction() == FACTION_PLAYER)
+		BattleUnit *shooter = projectile->getActor();
+		// Our shots on our turn are the player's own keypresses. On the aliens' turn they're reaction fire, worth saying.
+		if (shooter && shooter->getFaction() == FACTION_PLAYER && save->getSide() == FACTION_PLAYER)
 			return;
 		Uint32 now = SDL_GetTicks();
 		if (from == _shotFrom && at == _shotAt && now - _shotTime < BURST_WINDOW)
@@ -1086,10 +1088,10 @@ void update(BattlescapeState *state)
 	}
 	_shown.swap(shown);
 
-	// Incoming fire, spoken as the shot leaves so it comes before any hit or death.
+	// Shots, spoken as they leave so they come before any hit or death.
 	Projectile *projectile = state->getMap()->getProjectile();
 	if (projectile && projectile != _projectile)
-		incomingShot(state, projectile);
+		narrateShot(state, projectile);
 	_projectile = projectile;
 
 	// Aiming started: say what and how well, then put the cursor on the nearest enemy.
