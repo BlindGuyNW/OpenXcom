@@ -137,6 +137,7 @@ namespace
 		"missed",
 		"missed, hit {0}",
 		"explosion hits no one",
+		"solid",
 	};
 }
 

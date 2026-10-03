@@ -428,7 +428,16 @@ namespace
 
 		// Open air: say what you'd land on, so the cursor can stay on the level you picked.
 		bool openAir = p.z > 0 && tile->hasNoFloor(save->getTile(p + Position(0, 0, -1)));
-		if (openAir)
+		// Unless an impassable object fills the tile (a UFO's hull): it's solid, not a hole.
+		MapData *object = tile->getMapData(O_OBJECT);
+		bool solid = object && object->getBigWall() < Pathfinding::BIGWALLWEST && tile->getTUCost(O_OBJECT, MT_WALK) >= 255;
+		if (openAir && solid)
+		{
+			parts.erase(std::remove(parts.begin(), parts.end(), Vocab::get(Vocab::IMPASSABLE)), parts.end());
+			if (std::find(parts.begin(), parts.end(), Vocab::get(Vocab::OBSTACLE)) == parts.end())
+				parts.push_back(Vocab::get(Vocab::SOLID));
+		}
+		else if (openAir)
 		{
 			Position ground = settleDown(save, p);
 			if (ground.z < p.z)

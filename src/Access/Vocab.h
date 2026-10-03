@@ -140,6 +140,7 @@ namespace Vocab
 		MISSED,
 		MISSED_INTO,
 		BLAST_NO_ONE,
+		SOLID,
 		COUNT
 	};
 
