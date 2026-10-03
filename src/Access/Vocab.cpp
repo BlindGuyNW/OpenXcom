@@ -103,6 +103,15 @@ namespace
 		"{0}, {1}",
 		"{0}, none",
 		"That's gone",
+		"accuracy {0}%",
+		"{0} time units",
+		"not enough time units",
+		"{0}, choose a target",
+		"in view",
+		"out of view",
+		"{0} killed",
+		"{0} unconscious",
+		"{0} hit, health {1}",
 	};
 }
 

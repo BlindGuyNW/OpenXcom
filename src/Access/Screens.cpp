@@ -37,7 +37,15 @@
 #include "../Basescape/CraftSoldiersState.h"
 #include "../Basescape/SoldierArmorState.h"
 #include "../Basescape/SoldierInfoState.h"
+#include "../Engine/Action.h"
+#include "../Battlescape/ActionMenuItem.h"
+#include "../Battlescape/ActionMenuState.h"
+#include "../Battlescape/BattlescapeGame.h"
 #include "../Battlescape/BriefingState.h"
+#include "../Battlescape/PrimeGrenadeState.h"
+#include "../Mod/RuleItem.h"
+#include "../Savegame/BattleItem.h"
+#include "../Savegame/BattleUnit.h"
 #include "../Battlescape/InventoryState.h"
 #include "../Battlescape/NextTurnState.h"
 #include "../Engine/InteractiveSurface.h"
@@ -408,6 +416,75 @@ AccessScreen soldierInfo()
 	return s;
 }
 
+/// The Q/E popup: what the item in that hand can do, top to bottom as drawn
+/// (so Aimed Shot comes first), with accuracy and TU cost. Escape is the game's own cancel.
+AccessScreen actionMenu()
+{
+	AccessScreen s;
+	s.key = "actionMenu";
+	s.isActive = is<ActionMenuState>;
+	s.name = [](State *state)
+	{
+		BattleAction *action = static_cast<ActionMenuState *>(state)->getAction();
+		return std::string(state->tr(action->weapon->getRules()->getName()));
+	};
+	s.build = [](GraphBuilder &b, State *state)
+	{
+		BattleAction *action = static_cast<ActionMenuState *>(state)->getAction();
+		std::vector<ActionMenuItem *> items;
+		for (Surface *surface : state->getSurfaces())
+		{
+			ActionMenuItem *item = dynamic_cast<ActionMenuItem *>(surface);
+			if (item && item->getVisible())
+				items.push_back(item);
+		}
+		std::stable_sort(items.begin(), items.end(), [](ActionMenuItem *a, ActionMenuItem *c) { return a->getY() < c->getY(); });
+		for (ActionMenuItem *item : items)
+		{
+			std::vector<std::string> parts;
+			parts.push_back(item->getDescription());
+			if (item->getAccuracy() >= 0)
+				parts.push_back(Vocab::format(Vocab::ACCURACY, { std::to_string(item->getAccuracy()) }));
+			parts.push_back(Vocab::format(Vocab::TU_COST, { std::to_string(item->getTUs()) }));
+			if (item->getTUs() > action->actor->getTimeUnits())
+				parts.push_back(Vocab::get(Vocab::NOT_ENOUGH_TU));
+			std::string label;
+			for (const std::string &p : parts)
+				label += (label.empty() ? "" : ", ") + p;
+			b.AddItem(ControlId::Referenced(item, "action"), Controls::labelledButton(state, item, label));
+		}
+	};
+	return s;
+}
+
+/// Setting a grenade's timer: one button per turn count, 0 to 23. Escape cancels like a right click.
+AccessScreen primeGrenade()
+{
+	AccessScreen s;
+	s.key = "primeGrenade";
+	s.isActive = is<PrimeGrenadeState>;
+	s.name = [](State *state) { return static_cast<PrimeGrenadeState *>(state)->getTitle()->getText(); };
+	s.build = [](GraphBuilder &b, State *state)
+	{
+		PrimeGrenadeState *prime = static_cast<PrimeGrenadeState *>(state);
+		for (int i = 0; i < 24; ++i)
+		{
+			InteractiveSurface *button = prime->getButton(i);
+			b.AddItem(ControlId::Referenced(button, "timer"), Controls::labelledButton(state, button, std::to_string(i)));
+		}
+	};
+	s.back = [](State *state)
+	{
+		// The state closes itself on a right button press anywhere; the buttons only take left clicks.
+		SDL_Event ev = {};
+		ev.type = SDL_MOUSEBUTTONDOWN;
+		ev.button.button = SDL_BUTTON_RIGHT;
+		Action action(&ev, 1.0, 1.0, 0, 0);
+		state->handle(&action);
+	};
+	return s;
+}
+
 /// Moving items between the base's stores and the craft: Left/Right on a row, Shift for five.
 AccessScreen craftEquipment()
 {
@@ -448,6 +525,7 @@ const std::vector<AccessScreen> &all()
 		simpleScreen("craftArmor", is<CraftArmorState>),
 		simpleScreen("soldierArmor", is<SoldierArmorState>),
 		soldierInfo(),
+		actionMenu(), primeGrenade(),
 	};
 	return screens;
 }

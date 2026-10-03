@@ -59,6 +59,12 @@ namespace
 	BattleUnit *_soldier = 0;
 	/// Hostiles visible last frame, so newly spotted ones are spoken once.
 	std::set<BattleUnit *> _spotted;
+	/// Every unit shown last frame, so we can say when one we could see goes down.
+	std::set<BattleUnit *> _shown;
+	/// Our units' health last frame, to say when one is hit.
+	std::map<BattleUnit *, int> _health;
+	/// Was the game waiting for a target last frame?
+	bool _wasTargeting = false;
 	/// We started an action; speak the result once the game is idle again.
 	bool _awaiting = false;
 	/// When Ctrl+E was first pressed; a second press soon after ends the turn.
@@ -378,7 +384,23 @@ namespace
 		map->setSelectorTile(_cursor);
 	}
 
-	void moveCursor(BattlescapeState *state, Position to, bool levelChange)
+	/// While aiming: whether the soldier can see the unit on a tile. That's what the HUD's
+	/// numbered enemy buttons show, so a sighted player knows it too.
+	std::string targetText(BattlescapeState *state, Position p)
+	{
+		BattleAction *action = state->getBattleGame()->getCurrentAction();
+		Tile *tile = saveOf(state)->getTile(p);
+		if (!action->targeting || !action->actor || !tile || !tile->isDiscovered(2))
+			return std::string();
+		BattleUnit *unit = tile->getUnit();
+		if (!unitShown(unit) || unit->getFaction() == FACTION_PLAYER)
+			return std::string();
+		std::vector<BattleUnit *> *seen = action->actor->getVisibleUnits();
+		bool inView = std::find(seen->begin(), seen->end(), unit) != seen->end();
+		return Vocab::get(inView ? Vocab::IN_VIEW : Vocab::OUT_OF_VIEW);
+	}
+
+	void moveCursor(BattlescapeState *state, Position to, bool levelChange, bool interrupt = true)
 	{
 		if (!saveOf(state)->getTile(to))
 		{
@@ -390,7 +412,8 @@ namespace
 		std::string text = describeTile(state, _cursor, false);
 		if (levelChange)
 			text = Vocab::format(Vocab::LEVEL, { num(_cursor.z + 1) }) + ", " + text;
-		say(text, true);
+		text = joinComma({ text, targetText(state, _cursor) });
+		say(text, interrupt);
 	}
 
 	/// Total TU cost of the path the game just calculated, walked the way previewPath does.
@@ -661,12 +684,75 @@ namespace
 		say(Vocab::get(Vocab::SCAN_GONE), true);
 	}
 
+	const char *actionNameId(BattleActionType type)
+	{
+		switch (type)
+		{
+		case BA_AIMEDSHOT: return "STR_AIMED_SHOT";
+		case BA_SNAPSHOT: return "STR_SNAP_SHOT";
+		case BA_AUTOSHOT: return "STR_AUTO_SHOT";
+		case BA_THROW: return "STR_THROW";
+		case BA_LAUNCH: return "STR_LAUNCH_MISSILE";
+		case BA_MINDCONTROL: return "STR_MIND_CONTROL";
+		case BA_PANIC: return "STR_PANIC_UNIT";
+		case BA_USE: return "STR_USE_MIND_PROBE";
+		default: return 0;
+		}
+	}
+
+	void startAiming(BattlescapeState *state)
+	{
+		BattleAction *action = state->getBattleGame()->getCurrentAction();
+		std::vector<std::string> parts;
+		const char *id = actionNameId(action->type);
+		if (id)
+			parts.push_back(state->tr(id));
+		if (action->actor && action->weapon)
+		{
+			int acc = -1;
+			if (action->type == BA_THROW)
+				acc = (int)action->actor->getThrowingAccuracy();
+			else if (action->type == BA_AIMEDSHOT || action->type == BA_SNAPSHOT || action->type == BA_AUTOSHOT || action->type == BA_LAUNCH)
+				acc = action->actor->getFiringAccuracy(action->type, action->weapon);
+			if (acc >= 0)
+				parts.push_back(Vocab::format(Vocab::ACCURACY, { num(acc) }));
+		}
+		say(Vocab::format(Vocab::AIMING, { joinComma(parts) }), true);
+
+		// Already on a visible enemy? Leave it there.
+		Tile *tile = saveOf(state)->getTile(_cursor);
+		BattleUnit *there = tile ? tile->getUnit() : 0;
+		if (unitShown(there) && there->getFaction() == FACTION_HOSTILE)
+		{
+			say(joinComma({ describeTile(state, _cursor, false), targetText(state, _cursor) }), false);
+			return;
+		}
+		// Nearest enemy the soldier can see, else the nearest one shown at all.
+		std::vector<ScanEntry> enemies = scan(state, SCAN_ENEMIES);
+		if (enemies.empty())
+			return;
+		const ScanEntry *pick = &enemies[0];
+		std::vector<BattleUnit *> *seen = action->actor ? action->actor->getVisibleUnits() : 0;
+		for (const ScanEntry &e : enemies)
+		{
+			if (seen && std::find(seen->begin(), seen->end(), e.unit) != seen->end())
+			{
+				pick = &e;
+				break;
+			}
+		}
+		moveCursor(state, pick->unit->getPosition(), pick->unit->getPosition().z != _cursor.z, false);
+	}
+
 	void reset(SavedBattleGame *save)
 	{
 		_battle = save;
 		_selected = 0;
 		_soldier = 0;
 		_spotted.clear();
+		_shown.clear();
+		_health.clear();
+		_wasTargeting = false;
 		_scanCategory = SCAN_SOLDIERS;
 		_scanCurrent.unit = 0;
 		_scanCurrent.tag = -1;
@@ -815,6 +901,31 @@ void update(BattlescapeState *state)
 		}
 	}
 	_spotted.swap(visible);
+
+	// Units we could see going down, and our own being hit.
+	std::set<BattleUnit *> shown;
+	for (BattleUnit *unit : *save->getUnits())
+	{
+		std::string name = unit->getName(state->getGame()->getLanguage());
+		if (unitShown(unit))
+			shown.insert(unit);
+		else if (_shown.count(unit) && unit->isOut())
+			say(Vocab::format(unit->getStatus() == STATUS_DEAD ? Vocab::UNIT_KILLED : Vocab::UNIT_UNCONSCIOUS, { name }), false);
+		if (unit->getFaction() == FACTION_PLAYER && !unit->isOut())
+		{
+			std::map<BattleUnit *, int>::iterator h = _health.find(unit);
+			if (h != _health.end() && unit->getHealth() < h->second && unit->getHealth() > 0)
+				say(Vocab::format(Vocab::UNIT_WOUNDED, { name, num(unit->getHealth()) }), false);
+			_health[unit] = unit->getHealth();
+		}
+	}
+	_shown.swap(shown);
+
+	// Aiming started: say what and how well, then put the cursor on the nearest enemy.
+	bool targeting = state->getBattleGame()->getCurrentAction()->targeting && save->getSide() == FACTION_PLAYER;
+	if (targeting && !_wasTargeting)
+		startAiming(state);
+	_wasTargeting = targeting;
 
 	// An action we started has finished.
 	if (_awaiting && canAct(state))
