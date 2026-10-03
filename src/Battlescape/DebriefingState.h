@@ -112,6 +112,19 @@ public:
 	void txtTooltipIn(Action *action);
 	/// Handler for hiding tooltip.
 	void txtTooltipOut(Action *action);
+	/// Accessibility layer: the widgets it reads.
+	Text *getTitle() const { return _txtTitle; }
+	Text *getRating() const { return _txtRating; }
+	Text *getRecoveryHeading() const { return _txtRecovery; }
+	TextList *getStatsList() const { return _lstStats; }
+	TextList *getRecoveryList() const { return _lstRecovery; }
+	TextList *getTotalList() const { return _lstTotal; }
+	TextList *getSoldierStatsList() const { return _lstSoldierStats; }
+	/// The soldier stats table's column headers after the name, in column order. Their tooltips name the stat.
+	std::vector<Text *> getSoldierStatHeaders() const { return { _txtTU, _txtStamina, _txtHealth, _txtBravery, _txtReactions, _txtFiring, _txtThrowing, _txtMelee, _txtStrength, _txtPsiStrength, _txtPsiSkill }; }
+	bool isShowingSoldierStats() const { return _showSoldierStats; }
+	TextButton *getOkButton() const { return _btnOk; }
+	TextButton *getStatsButton() const { return _btnStats; }
 };
 
 }

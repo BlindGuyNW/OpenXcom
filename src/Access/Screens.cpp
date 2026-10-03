@@ -42,6 +42,7 @@
 #include "../Battlescape/ActionMenuState.h"
 #include "../Battlescape/BattlescapeGame.h"
 #include "../Battlescape/BriefingState.h"
+#include "../Battlescape/DebriefingState.h"
 #include "../Battlescape/PrimeGrenadeState.h"
 #include "../Mod/RuleItem.h"
 #include "../Savegame/BattleItem.h"
@@ -673,6 +674,94 @@ AccessScreen craftEquipment()
 	return s;
 }
 
+/// "Aliens killed: 1, score 10": a debriefing score row (item, quantity, score).
+std::string debriefRow(TextList *list, size_t row)
+{
+	if (list->getCellCount(row) < 3)
+		return Controls::rowText(list, row);
+	return Vocab::format(Vocab::DEBRIEF_ROW, { list->getCellText(row, 0), list->getCellText(row, 1), list->getCellText(row, 2) });
+}
+
+/// A read-only item.
+void addLine(GraphBuilder &b, const ControlId &id, std::function<std::string()> text)
+{
+	NodeVtable v;
+	v.Announcements.push_back(NodeAnnouncement(text, false, AnnouncementKinds::Label));
+	b.AddItem(id, v);
+}
+
+/// After a battle: the outcome, rating and total on arrival, then the score rows, the recovered
+/// items and the buttons. Stats switches to what each soldier gained ("Time Units +2, Bravery +10").
+/// Wired through DebriefingState's accessors, since its two pages overlap on screen.
+AccessScreen debriefing()
+{
+	AccessScreen s;
+	s.key = "debriefing";
+	s.isActive = is<DebriefingState>;
+	s.name = [](State *state)
+	{
+		DebriefingState *debrief = static_cast<DebriefingState *>(state);
+		std::string text = debrief->getTitle()->getText();
+		text += ". " + debrief->getRating()->getText();
+		if (debrief->getTotalList()->getTexts() > 0)
+			text += ". " + Controls::rowText(debrief->getTotalList(), 0);
+		return text;
+	};
+	s.build = [](GraphBuilder &b, State *state)
+	{
+		DebriefingState *debrief = static_cast<DebriefingState *>(state);
+		if (!debrief->isShowingSoldierStats())
+		{
+			TextList *stats = debrief->getStatsList();
+			for (size_t row = 0; row < stats->getTexts(); ++row)
+				addLine(b, ControlId::Referenced(stats, "stats:" + std::to_string(row)), [stats, row] { return debriefRow(stats, row); });
+			TextList *recovery = debrief->getRecoveryList();
+			if (recovery->getTexts() > 0)
+			{
+				b.PushContext(debrief->getRecoveryHeading()->getText());
+				for (size_t row = 0; row < recovery->getTexts(); ++row)
+					addLine(b, ControlId::Referenced(recovery, "recovery:" + std::to_string(row)), [recovery, row] { return debriefRow(recovery, row); });
+				b.PopContext();
+			}
+			TextList *total = debrief->getTotalList();
+			if (total->getTexts() > 0)
+				addLine(b, ControlId::Referenced(total, "total"), [total] { return Controls::rowText(total, 0); });
+			Text *rating = debrief->getRating();
+			addLine(b, ControlId::Referenced(rating, "rating"), [rating] { return rating->getText(); });
+		}
+		else
+		{
+			TextList *soldiers = debrief->getSoldierStatsList();
+			std::vector<std::string> statNames;
+			for (Text *header : debrief->getSoldierStatHeaders())
+				statNames.push_back(state->tr(header->getTooltip()));
+			for (size_t row = 0; row < soldiers->getTexts(); ++row)
+			{
+				addLine(b, ControlId::Referenced(soldiers, "soldier:" + std::to_string(row)), [soldiers, row, statNames]
+				{
+					// Column 0 is the name, then one column per stat; empty means no gain.
+					std::vector<std::string> gains;
+					for (size_t i = 0; i < statNames.size() && i + 1 < soldiers->getCellCount(row); ++i)
+					{
+						std::string cell = soldiers->getCellText(row, i + 1);
+						if (!cell.empty())
+							gains.push_back(Vocab::format(Vocab::STAT_GAIN, { statNames[i], cell }));
+					}
+					std::string text = soldiers->getCellText(row, 0) + ": ";
+					if (gains.empty())
+						return text + Vocab::get(Vocab::NO_STAT_GAINS);
+					for (size_t i = 0; i < gains.size(); ++i)
+						text += (i ? ", " : "") + gains[i];
+					return text;
+				});
+			}
+		}
+		b.AddItem(ControlId::Referenced(debrief->getOkButton(), "ok"), Controls::textButton(state, debrief->getOkButton()));
+		b.AddItem(ControlId::Referenced(debrief->getStatsButton(), "stats"), Controls::textButton(state, debrief->getStatsButton()));
+	};
+	return s;
+}
+
 }
 
 const std::vector<AccessScreen> &all()
@@ -685,7 +774,7 @@ const std::vector<AccessScreen> &all()
 		simpleScreen("craftArmor", is<CraftArmorState>),
 		simpleScreen("soldierArmor", is<SoldierArmorState>),
 		soldierInfo(),
-		actionMenu(), primeGrenade(),
+		actionMenu(), primeGrenade(), debriefing(),
 	};
 	return screens;
 }

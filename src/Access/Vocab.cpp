@@ -130,6 +130,9 @@ namespace
 		"below",
 		"facing {0}, toward you",
 		"dark",
+		"{0}: {1}, score {2}",
+		"{0} {1}",
+		"no change",
 	};
 }
 

@@ -133,6 +133,9 @@ namespace Vocab
 		BELOW,
 		FACING_YOU,
 		DARK,
+		DEBRIEF_ROW,
+		STAT_GAIN,
+		NO_STAT_GAINS,
 		COUNT
 	};
 
