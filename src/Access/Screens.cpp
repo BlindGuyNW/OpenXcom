@@ -451,7 +451,7 @@ AccessScreen actionMenu()
 			std::string label;
 			for (const std::string &p : parts)
 				label += (label.empty() ? "" : ", ") + p;
-			b.AddItem(ControlId::Referenced(item, "action"), Controls::labelledButton(state, item, label));
+			b.AddItem(ControlId::Referenced(item, "action:" + std::to_string((int)item->getAction())), Controls::labelledButton(state, item, label));
 		}
 	};
 	return s;
@@ -470,7 +470,7 @@ AccessScreen primeGrenade()
 		for (int i = 0; i < 24; ++i)
 		{
 			InteractiveSurface *button = prime->getButton(i);
-			b.AddItem(ControlId::Referenced(button, "timer"), Controls::labelledButton(state, button, std::to_string(i)));
+			b.AddItem(ControlId::Referenced(button, "timer:" + std::to_string(i)), Controls::labelledButton(state, button, std::to_string(i)));
 		}
 	};
 	s.back = [](State *state)
