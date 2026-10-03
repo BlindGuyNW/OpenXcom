@@ -103,6 +103,15 @@ The design follows the Graph A11y Kernel spec at `C:\git\sims2access\docs\graph-
 5. ~~Action menu~~, aiming, ~~enemy list (the scanner)~~, event narration (first pass in: spotted, down, our soldiers hit); still to do: medikit, shot results, alien turn movement
 6. Inventory (first pass in; not yet: Ctrl+click quick move, priming in pre-battle equip)
 
+Next up, in order (agreed after the first full playtest):
+
+1. Shot results: miss / hit on a non-fatal shot, after each shot.
+2. Alien turn: visible aliens moving and shooting, and the rough direction of incoming fire from unseen shooters (a sighted player sees the projectile).
+3. End of mission: debriefing and abort-mission screens (unchecked).
+4. Medikit screen; Blaster Launcher waypoints and launch button.
+5. Small: "1 time units" grammar, Ctrl+Enter quick move in the inventory, unit stats screen.
+6. Terrain wording ("obstacle", "stairs", "object") is guessed from MapData properties; revise as the user reports confusion.
+
 ## Git
 
 - Work on the `accessibility` branch. `master` tracks upstream. Remotes: `origin` is the user's fork (BlindGuyNW/OpenXcom) and `upstream` is OpenXcom/OpenXcom.
