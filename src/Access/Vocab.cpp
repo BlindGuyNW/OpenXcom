@@ -120,6 +120,12 @@ namespace
 		"{0} loaded",
 		"{0} to {1}",
 		"put back",
+		"fire from {0}",
+		"fire from {0} at {1}",
+		"{0} fires",
+		"{0} fires at {1}",
+		"above",
+		"below",
 	};
 }
 

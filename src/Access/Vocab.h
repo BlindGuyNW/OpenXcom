@@ -123,6 +123,12 @@ namespace Vocab
 		LOADED,
 		PLACED,
 		PUT_BACK,
+		FIRE_FROM,
+		FIRE_FROM_AT,
+		UNIT_FIRES,
+		UNIT_FIRES_AT,
+		ABOVE,
+		BELOW,
 		COUNT
 	};
 

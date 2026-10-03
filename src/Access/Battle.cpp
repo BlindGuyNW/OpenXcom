@@ -18,6 +18,7 @@
  */
 #include "Battle.h"
 #include <algorithm>
+#include <cmath>
 #include <cstdlib>
 #include <map>
 #include <set>
@@ -31,6 +32,7 @@
 #include "../Battlescape/Map.h"
 #include "../Battlescape/Pathfinding.h"
 #include "../Battlescape/Position.h"
+#include "../Battlescape/Projectile.h"
 #include "../Engine/Game.h"
 #include "../Engine/LocalizedText.h"
 #include "../Engine/Options.h"
@@ -67,6 +69,12 @@ namespace
 	bool _wasTargeting = false;
 	/// The selected soldier's stance last frame.
 	bool _kneeled = false;
+	/// The projectile in flight last frame, so each new shot is spoken once.
+	Projectile *_projectile = 0;
+	/// The last shot spoken, so an auto shot's bursts aren't repeated.
+	Position _shotFrom, _shotAt;
+	Uint32 _shotTime = 0;
+	const Uint32 BURST_WINDOW = 2000;
 	/// We started an action; speak the result once the game is idle again.
 	bool _awaiting = false;
 	/// When Ctrl+E was first pressed; a second press soon after ends the turn.
@@ -754,6 +762,59 @@ namespace
 		moveCursor(state, pick->unit->getPosition(), pick->unit->getPosition().z != _cursor.z, false);
 	}
 
+	/// Rough compass direction from one tile to another, plus above/below: "northeast, above".
+	std::string bearingText(Position from, Position to)
+	{
+		std::vector<std::string> parts;
+		int dx = to.x - from.x, dy = to.y - from.y, dz = to.z - from.z;
+		if (dx || dy)
+		{
+			// Game directions: 0 is north (-y), clockwise in eighths.
+			double angle = std::atan2((double)dx, (double)-dy);
+			parts.push_back(dirName((int)std::lround(angle / (3.14159265358979 / 4))));
+		}
+		if (dz)
+			parts.push_back(Vocab::get(dz > 0 ? Vocab::ABOVE : Vocab::BELOW));
+		return joinComma(parts);
+	}
+
+	/// Someone else's shot or throw just left: say who fired if we can see them,
+	/// else the direction it came from (a sighted player sees the projectile fly in).
+	void incomingShot(BattlescapeState *state, Projectile *projectile)
+	{
+		SavedBattleGame *save = saveOf(state);
+		Position from = projectile->getOrigin(), at = projectile->getTarget();
+		Tile *fromTile = save->getTile(from);
+		BattleUnit *shooter = fromTile ? fromTile->getUnit() : 0;
+		if (shooter && shooter->getFaction() == FACTION_PLAYER)
+			return;
+		Uint32 now = SDL_GetTicks();
+		if (from == _shotFrom && at == _shotAt && now - _shotTime < BURST_WINDOW)
+		{
+			_shotTime = now;
+			return;
+		}
+		_shotFrom = from;
+		_shotAt = at;
+		_shotTime = now;
+
+		Language *lang = state->getGame()->getLanguage();
+		Tile *atTile = save->getTile(at);
+		BattleUnit *target = atTile ? atTile->getUnit() : 0;
+		if (!unitShown(target))
+			target = 0;
+		if (unitShown(shooter))
+		{
+			std::string name = shooter->getName(lang);
+			say(target ? Vocab::format(Vocab::UNIT_FIRES_AT, { name, target->getName(lang) }) : Vocab::format(Vocab::UNIT_FIRES, { name }), false);
+			return;
+		}
+		std::string bearing = bearingText(at, from);
+		if (bearing.empty())
+			return;
+		say(target ? Vocab::format(Vocab::FIRE_FROM_AT, { bearing, target->getName(lang) }) : Vocab::format(Vocab::FIRE_FROM, { bearing }), false);
+	}
+
 	void reset(SavedBattleGame *save)
 	{
 		_battle = save;
@@ -763,6 +824,8 @@ namespace
 		_shown.clear();
 		_health.clear();
 		_wasTargeting = false;
+		_projectile = 0;
+		_shotTime = 0;
 		_scanCategory = SCAN_SOLDIERS;
 		_scanCurrent.unit = 0;
 		_scanCurrent.tag = -1;
@@ -938,6 +1001,12 @@ void update(BattlescapeState *state)
 		}
 	}
 	_shown.swap(shown);
+
+	// Incoming fire, spoken as the shot leaves so it comes before any hit or death.
+	Projectile *projectile = state->getMap()->getProjectile();
+	if (projectile && projectile != _projectile)
+		incomingShot(state, projectile);
+	_projectile = projectile;
 
 	// Aiming started: say what and how well, then put the cursor on the nearest enemy.
 	bool targeting = state->getBattleGame()->getCurrentAction()->targeting && save->getSide() == FACTION_PLAYER;
