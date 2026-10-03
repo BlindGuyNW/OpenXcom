@@ -19,6 +19,7 @@
 #include "Screens.h"
 #include "Controls.h"
 #include <algorithm>
+#include <map>
 #include <tuple>
 #include "../Engine/State.h"
 #include "../Interface/ComboBox.h"
@@ -35,6 +36,7 @@
 #include "../Basescape/CraftInfoState.h"
 #include "../Basescape/CraftSoldiersState.h"
 #include "../Basescape/SoldierArmorState.h"
+#include "../Basescape/SoldierInfoState.h"
 #include "../Battlescape/BriefingState.h"
 #include "../Battlescape/InventoryState.h"
 #include "../Battlescape/NextTurnState.h"
@@ -334,6 +336,78 @@ AccessScreen nextTurn()
 	return s;
 }
 
+/// The text of the first visible text edit of a state: the editable name, on screens that have one.
+std::string editText(State *state)
+{
+	for (Surface *s : state->getSurfaces())
+	{
+		TextEdit *edit = dynamic_cast<TextEdit *>(s);
+		if (edit && edit->getVisible())
+			return edit->getText();
+	}
+	return "";
+}
+
+/// Adds a state's visible text as read-only items, one per screen line, so a label and the
+/// value beside it ("Time Units", "54") read together.
+void addTextLines(GraphBuilder &b, State *state)
+{
+	std::map<int, std::vector<Text *> > lines;
+	std::map<int, size_t> firstIndex;
+	const std::vector<Surface *> &surfaces = state->getSurfaces();
+	for (size_t i = 0; i < surfaces.size(); ++i)
+	{
+		Text *text = dynamic_cast<Text *>(surfaces[i]);
+		if (!text || !text->getVisible() || text->getText().empty())
+			continue;
+		lines[text->getY()].push_back(text);
+		if (!firstIndex.count(text->getY()))
+			firstIndex[text->getY()] = i;
+	}
+	for (std::map<int, std::vector<Text *> >::iterator i = lines.begin(); i != lines.end(); ++i)
+	{
+		std::vector<Text *> texts = i->second;
+		std::stable_sort(texts.begin(), texts.end(), [](Text *a, Text *b) { return a->getX() < b->getX(); });
+		NodeVtable v;
+		v.Announcements.push_back(NodeAnnouncement([texts]
+		{
+			std::string line;
+			for (Text *text : texts)
+			{
+				if (!line.empty())
+					line += ", ";
+				line += text->getText();
+			}
+			return line;
+		}, false, AnnouncementKinds::Label));
+		b.AddItem(ControlId::Referenced(texts.front(), "line:" + std::to_string(firstIndex[i->first])), v);
+	}
+}
+
+/// A soldier's details: the stat lines, then the buttons. The arrow buttons get names
+/// and say who you've switched to.
+AccessScreen soldierInfo()
+{
+	AccessScreen s;
+	s.key = "soldierInfo";
+	s.isActive = is<SoldierInfoState>;
+	s.name = editText;
+	s.build = [](GraphBuilder &b, State *state)
+	{
+		addTextLines(b, state);
+		addWidgets(b, state, [state](Surface *surface, size_t, NodeVtable &v)
+		{
+			TextButton *btn = dynamic_cast<TextButton *>(surface);
+			if (!btn || (btn->getText() != "<<" && btn->getText() != ">>"))
+				return;
+			Vocab::Id label = btn->getText() == "<<" ? Vocab::PREVIOUS_SOLDIER : Vocab::NEXT_SOLDIER;
+			v.Announcements[0] = NodeAnnouncement([label] { return Vocab::get(label); }, false, AnnouncementKinds::Label);
+			v.StateText = [state] { return editText(state); };
+		});
+	};
+	return s;
+}
+
 /// Moving items between the base's stores and the craft: Left/Right on a row, Shift for five.
 AccessScreen craftEquipment()
 {
@@ -373,6 +447,7 @@ const std::vector<AccessScreen> &all()
 		craftEquipment(),
 		simpleScreen("craftArmor", is<CraftArmorState>),
 		simpleScreen("soldierArmor", is<SoldierArmorState>),
+		soldierInfo(),
 	};
 	return screens;
 }

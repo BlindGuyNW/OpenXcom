@@ -51,7 +51,8 @@ namespace Controls
 	void clickRow(State *state, TextList *list, size_t row, Uint8 mouseButton = SDL_BUTTON_LEFT);
 	/// A row's cells joined into one line.
 	std::string rowText(TextList *list, size_t row);
-	/// A node for a list row: its cells as the label; Enter left-clicks it if the list is selectable.
+	/// A node for a list row: its cells as the label. If the list is selectable,
+	/// Enter left-clicks the row and Backspace right-clicks it.
 	Graph::NodeVtable listRow(State *state, TextList *list, size_t row);
 	/// A node for a text button: its visible text as the label, Enter clicks it.
 	Graph::NodeVtable textButton(State *state, TextButton *button);

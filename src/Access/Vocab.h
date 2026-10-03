@@ -43,6 +43,8 @@ namespace Vocab
 		CONTINUE,
 		LIST,
 		NEW_BATTLE_NO_CREW,
+		PREVIOUS_SOLDIER,
+		NEXT_SOLDIER,
 		COUNT
 	};
 

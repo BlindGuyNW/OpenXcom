@@ -126,6 +126,7 @@ NodeVtable listRow(State *state, TextList *list, size_t row)
 	if (list->isSelectable())
 	{
 		v.OnActivate = [state, list, row] { clickRow(state, list, row); };
+		v.OnSecondary = [state, list, row] { clickRow(state, list, row, SDL_BUTTON_RIGHT); };
 		v.StateText = [list, row] { return rowText(list, row); };
 	}
 	return v;
