@@ -44,6 +44,10 @@
 #include "../Battlescape/BriefingState.h"
 #include "../Battlescape/DebriefingState.h"
 #include "../Battlescape/PrimeGrenadeState.h"
+#include "../Battlescape/MedikitState.h"
+#include "../Battlescape/MedikitView.h"
+#include "../Engine/Language.h"
+#include "../Mod/Unit.h"
 #include "../Mod/RuleItem.h"
 #include "../Savegame/BattleItem.h"
 #include "../Savegame/BattleUnit.h"
@@ -646,6 +650,125 @@ AccessScreen primeGrenade()
 	return s;
 }
 
+const char *const BODY_PARTS[6] = { "STR_HEAD", "STR_TORSO", "STR_RIGHT_ARM", "STR_LEFT_ARM", "STR_RIGHT_LEG", "STR_LEFT_LEG" };
+
+/// "no fatal wounds", "1 fatal wound", "3 fatal wounds".
+std::string woundsText(int n)
+{
+	if (n == 0)
+		return Vocab::get(Vocab::NO_FATAL_WOUNDS);
+	return n == 1 ? Vocab::get(Vocab::ONE_FATAL_WOUND) : Vocab::format(Vocab::FATAL_WOUNDS, { std::to_string(n) });
+}
+
+std::string joinParts(const std::vector<std::string> &parts)
+{
+	std::string s;
+	for (const std::string &p : parts)
+		s += (s.empty() ? "" : ", ") + p;
+	return s;
+}
+
+/// Health is only ours to know for our own units (the HUD shows it); the medikit screen never shows it.
+std::string medikitHealth(BattleUnit *target)
+{
+	if (target->getOriginalFaction() != FACTION_PLAYER)
+		return std::string();
+	return Vocab::format(Vocab::HEALTH, { std::to_string(target->getHealth()) });
+}
+
+/// After a use: what's left of it and the healer's time units.
+std::string medikitUseText(MedikitState *m, int left)
+{
+	return joinParts({ Vocab::format(Vocab::ITEMS_LEFT, { std::to_string(left) }), Vocab::format(Vocab::TIME_UNITS_LEFT, { std::to_string(m->getHealer()->getTimeUnits()) }) });
+}
+
+/// A medikit button: label, then what's left and the TU cost.
+NodeVtable medikitButton(State *state, InteractiveSurface *button, const std::string &label, std::function<std::string()> detail, std::function<std::string()> after)
+{
+	NodeVtable v = Controls::labelledButton(state, button, label);
+	v.Announcements.push_back(NodeAnnouncement(detail, false, AnnouncementKinds::Value));
+	v.StateText = after;
+	return v;
+}
+
+/// Using a medikit on the unit in front (or an unconscious one underfoot). On arrival: who and
+/// where the fatal wounds are. Then the six body parts (Enter selects one, as clicking the body
+/// diagram would; Heal works on the selected part), Heal, Stimulant, Pain Killer and Close.
+/// The game closes the screen itself when a stimulant or heal revives an unconscious unit.
+/// Wired through MedikitState's accessors.
+AccessScreen medikit()
+{
+	AccessScreen s;
+	s.key = "medikit";
+	s.isActive = is<MedikitState>;
+	s.name = [](State *state)
+	{
+		BattleUnit *target = static_cast<MedikitState *>(state)->getTarget();
+		Language *lang = State::getGamePtr()->getLanguage();
+		// Not ours: the race, since the screen doesn't say and ranks share a sprite.
+		std::string name = target->getOriginalFaction() == FACTION_PLAYER || !target->getUnitRules()
+			? target->getName(lang) : std::string(lang->getString(target->getUnitRules()->getRace()));
+		std::vector<std::string> wounded;
+		for (int i = 0; i < 6; ++i)
+		{
+			if (target->getFatalWound(i))
+				wounded.push_back(std::string(state->tr(BODY_PARTS[i])) + " " + std::to_string(target->getFatalWound(i)));
+		}
+		return joinParts({ Vocab::format(Vocab::MEDIKIT_ON, { name }), medikitHealth(target),
+			wounded.empty() ? Vocab::get(Vocab::NO_FATAL_WOUNDS) : Vocab::format(Vocab::FATAL_WOUNDS_IN, { joinParts(wounded) }) });
+	};
+	s.build = [](GraphBuilder &b, State *state)
+	{
+		MedikitState *m = static_cast<MedikitState *>(state);
+		BattleUnit *target = m->getTarget();
+		MedikitView *view = m->getView();
+		std::string cost = Vocab::format(Vocab::TU_COST, { std::to_string(m->getTUCost()) });
+		for (int i = 0; i < 6; ++i)
+		{
+			std::string part = state->tr(BODY_PARTS[i]);
+			NodeVtable v;
+			v.Type = &Controls::button();
+			v.Announcements.push_back(NodeAnnouncement([part] { return part; }, false, AnnouncementKinds::Label));
+			v.Announcements.push_back(NodeAnnouncement([target, view, i]
+			{
+				std::string text = woundsText(target->getFatalWound(i));
+				if (view->getSelectedPart() == i)
+					text += ", " + Vocab::get(Vocab::SELECTED);
+				return text;
+			}, false, AnnouncementKinds::Value));
+			v.OnActivate = [view, i] { view->setSelectedPart(i); };
+			v.StateText = [part] { return Vocab::format(Vocab::PART_SELECTED, { part }); };
+			b.AddItem(ControlId::Referenced(view, "part:" + std::to_string(i)), v);
+		}
+		BattleItem *item = m->getItem();
+		b.AddItem(ControlId::Referenced(m->getHealButton(), "heal"), medikitButton(state, m->getHealButton(), state->tr("STR_HEAL"),
+			[state, view, item, cost]
+			{
+				int part = view->getSelectedPart();
+				return joinParts({ part >= 0 ? std::string(state->tr(BODY_PARTS[part])) : std::string(), Vocab::format(Vocab::ITEMS_LEFT, { std::to_string(item->getHealQuantity()) }), cost });
+			},
+			[m, state, target, view, item]
+			{
+				int part = view->getSelectedPart();
+				std::string where = part >= 0 ? std::string(state->tr(BODY_PARTS[part])) + ": " + woundsText(target->getFatalWound(part)) : std::string();
+				return joinParts({ where, medikitHealth(target), medikitUseText(m, item->getHealQuantity()) });
+			}));
+		b.AddItem(ControlId::Referenced(m->getStimulantButton(), "stimulant"), medikitButton(state, m->getStimulantButton(), state->tr("STR_STIMULANT"),
+			[item, cost] { return joinParts({ Vocab::format(Vocab::ITEMS_LEFT, { std::to_string(item->getStimulantQuantity()) }), cost }); },
+			[m, item] { return medikitUseText(m, item->getStimulantQuantity()); }));
+		b.AddItem(ControlId::Referenced(m->getPainKillerButton(), "painKiller"), medikitButton(state, m->getPainKillerButton(), state->tr("STR_PAIN_KILLER"),
+			[item, cost] { return joinParts({ Vocab::format(Vocab::ITEMS_LEFT, { std::to_string(item->getPainKillerQuantity()) }), cost }); },
+			[m, item] { return medikitUseText(m, item->getPainKillerQuantity()); }));
+		b.AddItem(ControlId::Referenced(m->getEndButton(), "close"), Controls::labelledButton(state, m->getEndButton(), Vocab::get(Vocab::CLOSE)));
+	};
+	s.back = [](State *state)
+	{
+		MedikitState *m = static_cast<MedikitState *>(state);
+		Controls::click(state, m->getEndButton());
+	};
+	return s;
+}
+
 /// Moving items between the base's stores and the craft: Left/Right on a row, Shift for five.
 AccessScreen craftEquipment()
 {
@@ -774,7 +897,7 @@ const std::vector<AccessScreen> &all()
 		simpleScreen("craftArmor", is<CraftArmorState>),
 		simpleScreen("soldierArmor", is<SoldierArmorState>),
 		soldierInfo(),
-		actionMenu(), primeGrenade(), debriefing(),
+		actionMenu(), primeGrenade(), medikit(), debriefing(),
 	};
 	return screens;
 }

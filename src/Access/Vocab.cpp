@@ -141,6 +141,16 @@ namespace
 		"{0} {1}",
 		"lost sight of {0}",
 		"{0} bleeding, health {1}",
+		"medikit on {0}",
+		"health {0}",
+		"no fatal wounds",
+		"1 fatal wound",
+		"{0} fatal wounds",
+		"fatal wounds: {0}",
+		"selected",
+		"{0} selected",
+		"{0} left",
+		"close",
 	};
 }
 

@@ -45,5 +45,7 @@ public:
 	int getSelectedPart() const;
 	/// Updates the selected body part.
 	void updateSelectedPart();
+	/// Selects a body part, as clicking it would. For the accessibility layer.
+	void setSelectedPart(int part) { _selectedPart = part; _redraw = true; }
 };
 }
