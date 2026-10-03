@@ -25,6 +25,7 @@
 #include <string>
 #include <vector>
 #include "Speech.h"
+#include "TerrainNames.h"
 #include "Vocab.h"
 #include "../Battlescape/BattlescapeGame.h"
 #include "../Battlescape/BattlescapeState.h"
@@ -66,6 +67,8 @@ namespace
 	std::set<BattleUnit *> _shown;
 	/// Our units' health last frame, to say when one is hit.
 	std::map<BattleUnit *, int> _health;
+	/// The floor named at the cursor's last step.
+	std::string _lastFloor;
 	/// Was the game waiting for a target last frame?
 	bool _wasTargeting = false;
 	/// The selected soldier's stance last frame.
@@ -184,22 +187,29 @@ namespace
 		return name;
 	}
 
-	/// The edge kinds we describe, in the order they're read out.
-	enum EdgeKind { EDGE_NONE, EDGE_WALL, EDGE_DOOR, EDGE_UFO_DOOR, EDGE_UFO_DOOR_OPEN };
+	/// The edge kinds we describe.
+	enum EdgeKind { EDGE_NONE, EDGE_WALL, EDGE_DOOR, EDGE_UFO_DOOR, EDGE_UFO_DOOR_OPEN, EDGE_PASSABLE };
 
-	EdgeKind wallKind(Tile *owner, TilePart part)
+	/// What stands on an edge, and the piece it is (for its name).
+	struct Edge
+	{
+		EdgeKind kind;
+		const MapData *piece;
+	};
+
+	Edge wallKind(Tile *owner, TilePart part)
 	{
 		MapData *md = owner->getMapData(part);
 		if (!md)
-			return EDGE_NONE;
+			return { EDGE_NONE, 0 };
 		if (md->isUFODoor())
-			return owner->isUfoDoorOpen(part) ? EDGE_UFO_DOOR_OPEN : EDGE_UFO_DOOR;
+			return { owner->isUfoDoorOpen(part) ? EDGE_UFO_DOOR_OPEN : EDGE_UFO_DOOR, md };
 		if (md->isDoor())
-			return EDGE_DOOR;
-		// Wall pieces you can walk through (an opened door's replacement, for one) aren't worth a word.
+			return { EDGE_DOOR, md };
 		if (owner->getTUCost(part, MT_WALK) >= 255)
-			return EDGE_WALL;
-		return EDGE_NONE;
+			return { EDGE_WALL, md };
+		// Wall pieces you can walk through (an opened door, a broken fence) are only worth a word if they have a name.
+		return { EDGE_PASSABLE, md };
 	}
 
 	int bigWall(Tile *tile)
@@ -225,7 +235,7 @@ namespace
 
 	/// What stands on one side of a tile. Edges belong to whichever tile owns them:
 	/// a tile has only west and north walls, so its east wall is the west wall of the tile to the east.
-	EdgeKind edgeAt(SavedBattleGame *save, Tile *tile, Position p, int side)
+	Edge edgeAt(SavedBattleGame *save, Tile *tile, Position p, int side)
 	{
 		Tile *owner = 0;
 		TilePart part = O_NORTHWALL;
@@ -237,55 +247,81 @@ namespace
 		case 4: owner = save->getTile(p + Position(0, 1, 0)); part = O_NORTHWALL; seenFlag = 1; break;
 		case 2: owner = save->getTile(p + Position(1, 0, 0)); part = O_WESTWALL; seenFlag = 0; break;
 		}
+		Edge edge = { EDGE_NONE, 0 };
 		if (owner && (owner->isDiscovered(2) || owner->isDiscovered(seenFlag)))
 		{
-			EdgeKind kind = wallKind(owner, part);
-			if (kind != EDGE_NONE)
-				return kind;
+			edge = wallKind(owner, part);
+			// A blocking wall wins over something passable on the same edge.
+			if (edge.kind != EDGE_NONE && edge.kind != EDGE_PASSABLE)
+				return edge;
 		}
 		if (bigWallBlocks(bigWall(tile), side))
-			return EDGE_WALL;
+			return { EDGE_WALL, tile->getMapData(O_OBJECT) };
 		Position v;
 		Pathfinding::directionToVector(side, &v);
 		Tile *neighbour = save->getTile(p + v);
 		if (neighbour && neighbour->isDiscovered(2) && bigWallBlocks(bigWall(neighbour), (side + 4) % 8))
-			return EDGE_WALL;
-		return EDGE_NONE;
+			return { EDGE_WALL, neighbour->getMapData(O_OBJECT) };
+		return edge;
 	}
 
-	/// "wall north and east, door south".
+	/// What to call an edge: "wall", "wooden fence". Empty if it's not worth saying.
+	std::string edgeLabel(const Edge &edge)
+	{
+		// UFO doors open and close without changing piece, so their state comes from the tile.
+		if (edge.kind == EDGE_UFO_DOOR)
+			return Vocab::get(Vocab::UFO_DOOR);
+		if (edge.kind == EDGE_UFO_DOOR_OPEN)
+			return Vocab::get(Vocab::UFO_DOOR_OPEN);
+		std::string name = TerrainNames::get(edge.piece);
+		if (!name.empty())
+			return name;
+		if (edge.kind == EDGE_DOOR)
+			return Vocab::get(Vocab::DOOR);
+		if (edge.kind == EDGE_WALL)
+			return Vocab::get(Vocab::WALL);
+		return std::string();
+	}
+
+	/// "stone wall north and east, wooden door south".
 	std::string edgesText(SavedBattleGame *save, Tile *tile, Position p)
 	{
 		static const int sides[4] = { 0, 2, 4, 6 };
-		std::map<EdgeKind, std::vector<std::string> > byKind;
+		// Labels in the order first met, each with its sides.
+		std::vector<std::pair<std::string, std::vector<std::string> > > byLabel;
 		for (int side : sides)
 		{
-			EdgeKind kind = edgeAt(save, tile, p, side);
-			if (kind != EDGE_NONE)
-				byKind[kind].push_back(dirName(side));
+			std::string label = edgeLabel(edgeAt(save, tile, p, side));
+			if (label.empty())
+				continue;
+			size_t i = 0;
+			while (i < byLabel.size() && byLabel[i].first != label)
+				++i;
+			if (i == byLabel.size())
+				byLabel.push_back(std::make_pair(label, std::vector<std::string>()));
+			byLabel[i].second.push_back(dirName(side));
 		}
 		std::vector<std::string> parts;
-		for (const auto &k : byKind)
-		{
-			Vocab::Id id = Vocab::WALL;
-			switch (k.first)
-			{
-			case EDGE_DOOR: id = Vocab::DOOR; break;
-			case EDGE_UFO_DOOR: id = Vocab::UFO_DOOR; break;
-			case EDGE_UFO_DOOR_OPEN: id = Vocab::UFO_DOOR_OPEN; break;
-			default: break;
-			}
-			parts.push_back(Vocab::format(id, { joinAnd(k.second) }));
-		}
+		for (const auto &l : byLabel)
+			parts.push_back(Vocab::format(Vocab::EDGE, { l.first, joinAnd(l.second) }));
 		return joinComma(parts);
 	}
 
 	/// The tile's own contents: object, floor, smoke and fire.
-	std::vector<std::string> terrainParts(SavedBattleGame *save, Tile *tile, Position p, bool full)
+	std::vector<std::string> terrainParts(SavedBattleGame *save, Tile *tile, Position p, bool full, bool withFloor)
 	{
 		std::vector<std::string> parts;
 		MapData *object = tile->getMapData(O_OBJECT);
-		if (object)
+		// Big walls along an edge are named with the edges.
+		bool edgeObject = object && object->getBigWall() >= Pathfinding::BIGWALLWEST;
+		std::string objectName = edgeObject ? std::string() : TerrainNames::get(object);
+		if (!objectName.empty())
+		{
+			parts.push_back(objectName);
+			if (full && tile->getTUCost(O_OBJECT, MT_WALK) >= 255)
+				parts.push_back(Vocab::get(Vocab::IMPASSABLE));
+		}
+		else if (object)
 		{
 			int big = object->getBigWall();
 			if (big == Pathfinding::BLOCK)
@@ -303,6 +339,12 @@ namespace
 			}
 		}
 		MapData *floor = tile->getMapData(O_FLOOR);
+		if (withFloor)
+		{
+			std::string floorName = TerrainNames::get(floor);
+			if (!floorName.empty())
+				parts.push_back(floorName);
+		}
 		if (floor && floor->isGravLift())
 			parts.push_back(Vocab::get(Vocab::LIFT));
 		if (floor && floor->getSpecialType() == START_POINT)
@@ -329,9 +371,29 @@ namespace
 		}
 	}
 
-	/// What a sighted player sees on a tile. Brief is for cursor steps, full for Ctrl+L.
-	std::string describeTile(BattlescapeState *state, Position p, bool full)
+	/// The ground a tile's description talks about: the tile itself, or where you'd land from open air.
+	Position groundOf(SavedBattleGame *save, Position p)
 	{
+		Tile *tile = save->getTile(p);
+		if (tile && p.z > 0 && tile->hasNoFloor(save->getTile(p + Position(0, 0, -1))))
+			return settleDown(save, p);
+		return p;
+	}
+
+	/// The name of the floor under p (or below it, from open air), for the floor differ.
+	std::string floorName(SavedBattleGame *save, Position p)
+	{
+		Tile *tile = save->getTile(groundOf(save, p));
+		if (!tile || !tile->isDiscovered(2))
+			return std::string();
+		return TerrainNames::get(tile->getMapData(O_FLOOR));
+	}
+
+	/// What a sighted player sees on a tile. Brief is for cursor steps, full for Ctrl+L.
+	/// The floor is named only with withFloor (always in full), since every tile has one.
+	std::string describeTile(BattlescapeState *state, Position p, bool full, bool withFloor = false)
+	{
+		withFloor = withFloor || full;
 		SavedBattleGame *save = saveOf(state);
 		Tile *tile = save->getTile(p);
 		if (!tile)
@@ -351,7 +413,7 @@ namespace
 		if (items->size() > shown)
 			parts.push_back(Vocab::format(Vocab::MORE_ITEMS, { num((int)(items->size() - shown)) }));
 
-		for (const std::string &s : terrainParts(save, tile, p, full))
+		for (const std::string &s : terrainParts(save, tile, p, full, withFloor))
 			parts.push_back(s);
 		parts.push_back(edgesText(save, tile, p));
 
@@ -361,7 +423,7 @@ namespace
 		{
 			Position ground = settleDown(save, p);
 			if (ground.z < p.z)
-				parts.push_back(Vocab::format(Vocab::NO_FLOOR_BELOW, { num(p.z - ground.z), describeTile(state, ground, full) }));
+				parts.push_back(Vocab::format(Vocab::NO_FLOOR_BELOW, { num(p.z - ground.z), describeTile(state, ground, full, withFloor) }));
 			else
 				parts.push_back(Vocab::get(Vocab::NO_FLOOR));
 		}
@@ -445,7 +507,11 @@ namespace
 		}
 		_cursor = to;
 		showCursor(state);
-		std::string text = describeTile(state, _cursor, false);
+		// Name the floor only when it changes, so a field isn't "grass" at every step.
+		std::string floor = floorName(saveOf(state), _cursor);
+		bool newFloor = floor != _lastFloor;
+		_lastFloor = floor;
+		std::string text = describeTile(state, _cursor, false, newFloor);
 		if (levelChange)
 			text = Vocab::format(Vocab::LEVEL, { num(_cursor.z + 1) }) + ", " + text;
 		text = joinComma({ text, targetText(state, _cursor) });
@@ -592,16 +658,10 @@ namespace
 		{
 			if (!tile->isDiscovered(2) && !tile->isDiscovered(i))
 				continue;
-			EdgeKind kind = wallKind(tile, parts[i]);
-			Vocab::Id id;
-			switch (kind)
-			{
-			case EDGE_DOOR: id = Vocab::DOOR; break;
-			case EDGE_UFO_DOOR: id = Vocab::UFO_DOOR; break;
-			case EDGE_UFO_DOOR_OPEN: id = Vocab::UFO_DOOR_OPEN; break;
-			default: continue;
-			}
-			out.push_back({ Vocab::format(id, { dirName(i == 0 ? 6 : 0) }), tile->getPosition(), 0, i });
+			Edge edge = wallKind(tile, parts[i]);
+			if (edge.kind != EDGE_DOOR && edge.kind != EDGE_UFO_DOOR && edge.kind != EDGE_UFO_DOOR_OPEN)
+				continue;
+			out.push_back({ Vocab::format(Vocab::EDGE, { edgeLabel(edge), dirName(i == 0 ? 6 : 0) }), tile->getPosition(), 0, i });
 		}
 	}
 
@@ -854,6 +914,7 @@ namespace
 		_scanCurrent.tag = -1;
 		_awaiting = false;
 		_endTurnArmed = 0;
+		_lastFloor.clear();
 		_cursor = Position(save->getMapSizeX() / 2, save->getMapSizeY() / 2, 0);
 		// Enter previews a move before making it, so the game's two-click move must be on.
 		if (Options::battleNewPreviewPath == PATH_NONE)
