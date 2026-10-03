@@ -316,7 +316,8 @@ std::string inventoryItemText(State *state, BattleItem *item)
 		name = state->tr(item->getRules()->getName());
 	else
 		name = state->tr("STR_ALIEN_ARTIFACT");
-	if (item->needsAmmo())
+	// needsAmmo() is also true of grenades and the like, so ask whether it takes clips at all.
+	if (!item->getRules()->getCompatibleAmmo()->empty())
 	{
 		BattleItem *ammo = item->getAmmoItem();
 		name = ammo ? Vocab::format(Vocab::ROUNDS, { name, std::to_string(ammo->getAmmoQuantity()) }) : Vocab::format(Vocab::NO_AMMO, { name });

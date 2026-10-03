@@ -452,7 +452,13 @@ namespace
 		}
 		BattleUnit *before = save->getSelectedUnit();
 		bool targeting = bg->getCurrentAction()->targeting;
-		bg->primaryAction(_cursor);
+		Position target = _cursor;
+		// Aiming at open air: aim at what's below instead, as a sighted player
+		// would by looking at that level. Throws at a floorless tile fail outright.
+		Tile *tile = save->getTile(target);
+		if (targeting && target.z > 0 && !tile->getUnit() && tile->hasNoFloor(save->getTile(target + Position(0, 0, -1))))
+			target = settleDown(save, target);
+		bg->primaryAction(target);
 		if (bg->isBusy())
 		{
 			_awaiting = true;
