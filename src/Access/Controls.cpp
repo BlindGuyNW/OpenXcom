@@ -17,10 +17,13 @@
  * along with OpenXcom.  If not, see <http://www.gnu.org/licenses/>.
  */
 #include "Controls.h"
+#include <algorithm>
 #include "Vocab.h"
 #include "../Engine/Action.h"
 #include "../Engine/InteractiveSurface.h"
 #include "../Engine/State.h"
+#include "../Interface/ComboBox.h"
+#include "../Interface/Slider.h"
 #include "../Interface/TextButton.h"
 
 namespace OpenXcom
@@ -31,20 +34,41 @@ namespace Controls
 
 using namespace Graph;
 
-const ControlType &button()
+namespace
 {
-	static const ControlType type = []
+	/// Shift+Left/Right step size for combo boxes and sliders.
+	const int LARGE_STEP = 5;
+
+	/// A control type that speaks label, value, then its role word.
+	ControlType makeType(const char *key, Vocab::Id role)
 	{
 		ControlType t;
-		t.Key = "button";
+		t.Key = key;
 		t.Order = { AnnouncementKinds::Label, AnnouncementKinds::Value, AnnouncementKinds::Role,
 			AnnouncementKinds::Selected, AnnouncementKinds::Enabled };
-		t.Common = []
+		t.Common = [role]
 		{
-			return std::vector<NodeAnnouncement>{ NodeAnnouncement([] { return Vocab::get(Vocab::ROLE_BUTTON); }, false, AnnouncementKinds::Role) };
+			return std::vector<NodeAnnouncement>{ NodeAnnouncement([role] { return Vocab::get(role); }, false, AnnouncementKinds::Role) };
 		};
 		return t;
-	}();
+	}
+}
+
+const ControlType &button()
+{
+	static const ControlType type = makeType("button", Vocab::ROLE_BUTTON);
+	return type;
+}
+
+const ControlType &comboBoxType()
+{
+	static const ControlType type = makeType("comboBox", Vocab::ROLE_COMBO_BOX);
+	return type;
+}
+
+const ControlType &sliderType()
+{
+	static const ControlType type = makeType("slider", Vocab::ROLE_SLIDER);
 	return type;
 }
 
@@ -71,6 +95,45 @@ NodeVtable textButton(State *state, TextButton *btn)
 	v.Type = &button();
 	v.Announcements.push_back(NodeAnnouncement([btn] { return btn->getText(); }, false, AnnouncementKinds::Label));
 	v.OnActivate = [state, btn] { click(state, btn); };
+	return v;
+}
+
+NodeVtable comboBox(State *state, ComboBox *box, const std::string &label)
+{
+	NodeVtable v;
+	v.Type = &comboBoxType();
+	v.Announcements.push_back(NodeAnnouncement([label] { return label; }, false, AnnouncementKinds::Label));
+	v.Announcements.push_back(NodeAnnouncement([box] { return box->getSelectedText(); }, false, AnnouncementKinds::Value));
+	v.OnAdjust = [state, box](int sign, bool large)
+	{
+		int count = (int)box->getOptionCount();
+		if (count == 0)
+			return;
+		int sel = std::max(0, std::min(count - 1, (int)box->getSelected() + sign * (large ? LARGE_STEP : 1)));
+		if (sel == (int)box->getSelected())
+			return;
+		box->setSelected(sel);
+		box->notifyChange(state);
+	};
+	v.StateText = [box] { return box->getSelectedText(); };
+	return v;
+}
+
+NodeVtable slider(State *state, Slider *slider, const std::string &label)
+{
+	NodeVtable v;
+	v.Type = &sliderType();
+	v.Announcements.push_back(NodeAnnouncement([label] { return label; }, false, AnnouncementKinds::Label));
+	v.Announcements.push_back(NodeAnnouncement([slider] { return std::to_string(slider->getValue()); }, false, AnnouncementKinds::Value));
+	v.OnAdjust = [state, slider](int sign, bool large)
+	{
+		int value = std::max(slider->getMin(), std::min(slider->getMax(), slider->getValue() + sign * (large ? LARGE_STEP : 1)));
+		if (value == slider->getValue())
+			return;
+		slider->setValue(value);
+		slider->notifyChange(state);
+	};
+	v.StateText = [slider] { return std::to_string(slider->getValue()); };
 	return v;
 }
 

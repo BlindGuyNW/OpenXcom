@@ -253,6 +253,36 @@ size_t ComboBox::getSelected() const
 	return _sel;
 }
 
+/**
+ * Returns the number of options in the list.
+ * @return Option count.
+ */
+size_t ComboBox::getOptionCount() const
+{
+	return _list->getTexts();
+}
+
+/**
+ * Returns the text on the button.
+ * @return Button text.
+ */
+std::string ComboBox::getSelectedText() const
+{
+	return _button->getText();
+}
+
+/**
+ * Runs the change handler, if any. Handlers get no action.
+ * @param state State the handler belongs to.
+ */
+void ComboBox::notifyChange(State *state)
+{
+	if (_change)
+	{
+		(state->*_change)(0);
+	}
+}
+
 size_t ComboBox::getHoveredListIdx() const
 {
 	size_t ret = -1;

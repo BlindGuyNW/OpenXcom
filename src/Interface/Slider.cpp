@@ -240,6 +240,36 @@ int Slider::getValue() const
 }
 
 /**
+ * Returns the smallest value of the slider's range.
+ * @return Minimum.
+ */
+int Slider::getMin() const
+{
+	return std::min(_min, _max);
+}
+
+/**
+ * Returns the largest value of the slider's range.
+ * @return Maximum.
+ */
+int Slider::getMax() const
+{
+	return std::max(_min, _max);
+}
+
+/**
+ * Runs the change handler, if any. Handlers get no action.
+ * @param state State the handler belongs to.
+ */
+void Slider::notifyChange(State *state)
+{
+	if (_change)
+	{
+		(state->*_change)(0);
+	}
+}
+
+/**
  * Blits the slider contents
  * @param surface Pointer to surface to blit onto.
  */

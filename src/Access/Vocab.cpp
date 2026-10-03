@@ -32,6 +32,8 @@ namespace
 		"OpenXcom accessibility loaded",
 		"Nothing to repeat",
 		"button",
+		"combo box",
+		"slider",
 		"{0} of {1}",
 		"No tooltip",
 	};

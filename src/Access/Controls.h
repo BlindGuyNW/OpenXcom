@@ -17,6 +17,7 @@
  * You should have received a copy of the GNU General Public License
  * along with OpenXcom.  If not, see <http://www.gnu.org/licenses/>.
  */
+#include <string>
 #include <SDL.h>
 #include "Graph/GraphTypes.hpp"
 
@@ -26,6 +27,8 @@ namespace OpenXcom
 class State;
 class InteractiveSurface;
 class TextButton;
+class ComboBox;
+class Slider;
 
 /**
  * Building blocks for graph screen recipes: the one control type registry
@@ -35,11 +38,20 @@ namespace Controls
 {
 	/// The "button" control type.
 	const Graph::ControlType &button();
+	/// The "combo box" control type.
+	const Graph::ControlType &comboBoxType();
+	/// The "slider" control type.
+	const Graph::ControlType &sliderType();
 	/// Clicks a surface the way the mouse would: press, release, click.
 	/// Runs the surface's own handlers, so sounds and side effects match a real click.
 	void click(State *state, InteractiveSurface *surface, Uint8 mouseButton = SDL_BUTTON_LEFT);
 	/// A node for a text button: its visible text as the label, Enter clicks it.
 	Graph::NodeVtable textButton(State *state, TextButton *button);
+	/// A node for a combo box: Left/Right step through the options (Shift for bigger steps)
+	/// and run the box's change handler, as picking from the drop-down would.
+	Graph::NodeVtable comboBox(State *state, ComboBox *box, const std::string &label);
+	/// A node for a slider: Left/Right change the value (Shift for bigger steps) and run its change handler.
+	Graph::NodeVtable slider(State *state, Slider *slider, const std::string &label);
 }
 
 }

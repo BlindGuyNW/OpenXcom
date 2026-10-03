@@ -18,10 +18,16 @@
  */
 #include "Screens.h"
 #include "Controls.h"
+#include <algorithm>
+#include <tuple>
 #include "../Engine/State.h"
+#include "../Interface/ComboBox.h"
+#include "../Interface/Frame.h"
+#include "../Interface/Slider.h"
 #include "../Interface/Text.h"
 #include "../Interface/TextButton.h"
 #include "../Menu/MainMenuState.h"
+#include "../Menu/NewBattleState.h"
 
 namespace OpenXcom
 {
@@ -46,17 +52,103 @@ std::string firstText(State *state)
 	return "";
 }
 
-/// Adds every visible text button of a state as a vertical list, in the order the state added them.
-/// Keys are the buttons' indices among the state's elements, which only change if the state's code does.
-void addTextButtons(GraphBuilder &b, State *state)
+bool overlaps(int a, int aLen, int b, int bLen)
 {
+	return a < b + bLen && b < a + aLen;
+}
+
+/// The visible frame that holds a surface's centre, if any.
+Frame *frameFor(State *state, Surface *target)
+{
+	int x = target->getX() + target->getWidth() / 2, y = target->getY() + target->getHeight() / 2;
+	for (Surface *s : state->getSurfaces())
+	{
+		Frame *frame = dynamic_cast<Frame *>(s);
+		if (frame && frame->getVisible() &&
+			x >= frame->getX() && x < frame->getX() + frame->getWidth() &&
+			y >= frame->getY() && y < frame->getY() + frame->getHeight())
+			return frame;
+	}
+	return 0;
+}
+
+/// The text a sighted player reads as a surface's label: the nearest visible text to its left
+/// on the same row and in the same frame, else the one just above it. Empty if there's none.
+/// Frames and other headed blocks pass sameRow = false: only text above them is their heading.
+std::string labelFor(State *state, Surface *target, bool sameRow = true)
+{
+	Frame *frame = sameRow ? frameFor(state, target) : 0;
+	Text *left = 0, *above = 0;
+	for (Surface *s : state->getSurfaces())
+	{
+		Text *text = dynamic_cast<Text *>(s);
+		if (!text || !text->getVisible() || text->getText().empty())
+			continue;
+		if (overlaps(text->getY(), text->getHeight(), target->getY(), target->getHeight()) && text->getX() < target->getX())
+		{
+			if (!sameRow || frameFor(state, text) != frame)
+				continue;
+			if (!left || text->getX() > left->getX())
+				left = text;
+		}
+		else if (overlaps(text->getX(), text->getWidth(), target->getX(), target->getWidth()))
+		{
+			int gap = target->getY() - (text->getY() + text->getHeight());
+			if (gap >= 0 && gap <= 4 && (!above || text->getY() > above->getY()))
+				above = text;
+		}
+	}
+	return left ? left->getText() : above ? above->getText() : "";
+}
+
+/// Adds every visible button, combo box and slider of a state as a vertical list in reading order:
+/// top to bottom, with each frame's controls together under the frame's heading.
+/// Keys are the widgets' indices among the state's elements, which only change if the state's code does.
+void addWidgets(GraphBuilder &b, State *state)
+{
+	struct Widget
+	{
+		size_t index;
+		Surface *surface;
+		Frame *frame;
+		// Framed controls sort at their frame's position, so a frame reads as one block.
+		std::tuple<int, int, int, int> order() const
+		{
+			Surface *anchor = frame ? (Surface *)frame : surface;
+			return std::make_tuple(anchor->getY(), anchor->getX(), surface->getY(), surface->getX());
+		}
+	};
+	std::vector<Widget> widgets;
 	const std::vector<Surface *> &surfaces = state->getSurfaces();
 	for (size_t i = 0; i < surfaces.size(); ++i)
 	{
-		TextButton *btn = dynamic_cast<TextButton *>(surfaces[i]);
-		if (btn && btn->getVisible())
-			b.AddItem(ControlId::Referenced(btn, "button:" + std::to_string(i)), Controls::textButton(state, btn));
+		Surface *s = surfaces[i];
+		if (s->getVisible() && (dynamic_cast<TextButton *>(s) || dynamic_cast<ComboBox *>(s) || dynamic_cast<Slider *>(s)))
+			widgets.push_back(Widget{ i, s, frameFor(state, s) });
 	}
+	std::stable_sort(widgets.begin(), widgets.end(), [](const Widget &a, const Widget &b) { return a.order() < b.order(); });
+
+	Frame *context = 0;
+	for (const Widget &w : widgets)
+	{
+		if (w.frame != context)
+		{
+			if (context)
+				b.PopContext();
+			context = w.frame;
+			if (context)
+				b.PushContext(labelFor(state, context, false));
+		}
+		ControlId id = ControlId::Referenced(w.surface, "widget:" + std::to_string(w.index));
+		if (TextButton *btn = dynamic_cast<TextButton *>(w.surface))
+			b.AddItem(id, Controls::textButton(state, btn));
+		else if (ComboBox *box = dynamic_cast<ComboBox *>(w.surface))
+			b.AddItem(id, Controls::comboBox(state, box, labelFor(state, box)));
+		else if (Slider *slider = dynamic_cast<Slider *>(w.surface))
+			b.AddItem(id, Controls::slider(state, slider, labelFor(state, slider)));
+	}
+	if (context)
+		b.PopContext();
 }
 
 AccessScreen mainMenu()
@@ -65,7 +157,17 @@ AccessScreen mainMenu()
 	s.key = "mainMenu";
 	s.isActive = [](State *state) { return dynamic_cast<MainMenuState *>(state) != nullptr; };
 	s.name = firstText;
-	s.build = addTextButtons;
+	s.build = addWidgets;
+	return s;
+}
+
+AccessScreen newBattle()
+{
+	AccessScreen s;
+	s.key = "newBattle";
+	s.isActive = [](State *state) { return dynamic_cast<NewBattleState *>(state) != nullptr; };
+	s.name = firstText;
+	s.build = addWidgets;
 	return s;
 }
 
@@ -73,7 +175,7 @@ AccessScreen mainMenu()
 
 const std::vector<AccessScreen> &all()
 {
-	static const std::vector<AccessScreen> screens = { mainMenu() };
+	static const std::vector<AccessScreen> screens = { mainMenu(), newBattle() };
 	return screens;
 }
 
