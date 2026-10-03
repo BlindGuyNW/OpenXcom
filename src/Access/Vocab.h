@@ -129,6 +129,7 @@ namespace Vocab
 		UNIT_FIRES_AT,
 		ABOVE,
 		BELOW,
+		FACING_YOU,
 		COUNT
 	};
 

@@ -154,6 +154,22 @@ namespace
 		return unit && !unit->isOut() && (unit->getFaction() == FACTION_PLAYER || unit->getVisible());
 	}
 
+	/// Which way a hostile faces (its sprite shows it), with "toward you" when the
+	/// selected soldier is inside its view cone. Empty for anyone else.
+	std::string facingText(BattleUnit *unit)
+	{
+		if (unit->getFaction() != FACTION_HOSTILE)
+			return std::string();
+		bool toward = _soldier && !_soldier->isOut() && unit->checkViewSector(_soldier->getPosition());
+		return Vocab::format(toward ? Vocab::FACING_YOU : Vocab::FACING, { dirName(unit->getDirection()) });
+	}
+
+	/// A shown unit's name, plus its facing if it's hostile.
+	std::string unitName(BattlescapeState *state, BattleUnit *unit)
+	{
+		return joinComma({ unit->getName(state->getGame()->getLanguage()), facingText(unit) });
+	}
+
 	std::string itemText(BattlescapeState *state, BattleItem *item)
 	{
 		std::string name = state->tr(item->getRules()->getName());
@@ -325,7 +341,7 @@ namespace
 		std::vector<std::string> parts;
 		BattleUnit *unit = tile->getUnit();
 		if (unitShown(unit))
-			parts.push_back(unit->getName(state->getGame()->getLanguage()));
+			parts.push_back(unitName(state, unit));
 
 		std::vector<BattleItem *> *items = tile->getInventory();
 		const size_t shown = full ? items->size() : 2;
@@ -584,7 +600,6 @@ namespace
 	std::vector<ScanEntry> scan(BattlescapeState *state, int category)
 	{
 		SavedBattleGame *save = saveOf(state);
-		Language *lang = state->getGame()->getLanguage();
 		std::vector<ScanEntry> out;
 		if (category <= SCAN_CIVILIANS)
 		{
@@ -592,7 +607,7 @@ namespace
 			for (BattleUnit *unit : *save->getUnits())
 			{
 				if (unit->getFaction() == factions[category] && unitShown(unit))
-					out.push_back({ unit->getName(lang), unit->getPosition(), unit, 0 });
+					out.push_back({ unitName(state, unit), unit->getPosition(), unit, 0 });
 			}
 		}
 		else
@@ -978,7 +993,7 @@ void update(BattlescapeState *state)
 		visible.insert(unit);
 		if (_spotted.find(unit) == _spotted.end())
 		{
-			say(Vocab::format(Vocab::SPOTTED, { unit->getName(state->getGame()->getLanguage()), offsetText(anchor(), unit->getPosition()) }), false);
+			say(joinComma({ Vocab::format(Vocab::SPOTTED, { unit->getName(state->getGame()->getLanguage()), offsetText(anchor(), unit->getPosition()) }), facingText(unit) }), false);
 		}
 	}
 	_spotted.swap(visible);

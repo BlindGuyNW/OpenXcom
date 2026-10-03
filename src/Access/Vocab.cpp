@@ -126,6 +126,7 @@ namespace
 		"{0} fires at {1}",
 		"above",
 		"below",
+		"facing {0}, toward you",
 	};
 }
 
