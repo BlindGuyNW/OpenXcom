@@ -71,6 +71,7 @@
 #include "../Savegame/BattleItem.h"
 #include "../Savegame/Ufo.h"
 #include "../Mod/RuleInterface.h"
+#include "../Access/Speech.h"
 
 namespace OpenXcom
 {
@@ -1548,6 +1549,7 @@ void BattlescapeState::debug(const std::string &message)
 void BattlescapeState::warning(const std::string &message)
 {
 	_warning->showMessage(tr(message));
+	Speech::say(tr(message), true);
 }
 
 /**

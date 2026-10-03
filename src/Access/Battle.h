@@ -1,0 +1,49 @@
+#pragma once
+/*
+ * Copyright 2010-2016 OpenXcom Developers.
+ *
+ * This file is part of OpenXcom.
+ *
+ * OpenXcom is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * OpenXcom is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with OpenXcom.  If not, see <http://www.gnu.org/licenses/>.
+ */
+#include <SDL.h>
+
+namespace OpenXcom
+{
+
+class BattlescapeState;
+
+/**
+ * The battle map exploration layer: a keyboard tile cursor over the Battlescape.
+ * It isn't a graph screen; the navigator hands it keys only while the
+ * BattlescapeState is on top and no graph screen claims the keyboard.
+ * Main thread only.
+ *
+ * Keys: arrows move the cursor by compass direction (Up is north),
+ * Page Up/Down change level, Home returns to the selected soldier,
+ * Enter acts on the cursor tile like a left click (first press previews a move
+ * and says its cost, the second moves), Backspace turns to face the tile or
+ * opens a door like a right click, Escape cancels targeting,
+ * Tab/Shift+Tab cycle soldiers, Space reads the soldier's status,
+ * Ctrl+L reads the cursor tile in full, Ctrl+E twice ends the turn.
+ */
+namespace Battle
+{
+	/// Acts on a key-down. Returns whether the layer owns the key.
+	bool handleKey(BattlescapeState *state, SDLKey key, bool shift, bool ctrl);
+	/// Per-frame tick: the selection, spotting and action-result differs.
+	void update(BattlescapeState *state);
+}
+
+}

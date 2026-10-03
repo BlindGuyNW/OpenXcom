@@ -35,6 +35,8 @@ class Game;
  * Backspace is the secondary action, Space reads the tooltip, Ctrl+L says where
  * you are, and Escape goes back where the screen defines it.
  * Everywhere: Ctrl+R repeats the last thing spoken.
+ * When no recipe matches and the Battlescape is on top, keys and ticks go to
+ * the battle map layer (Battle.h) instead.
  */
 namespace Navigator
 {

@@ -70,11 +70,15 @@ The design follows the Graph A11y Kernel spec at `C:\git\sims2access\docs\graph-
   - Screens so far: main menu, New Battle (OK speaks a warning if it fails because the craft is empty), briefing, battle inventory (OK/prev/next only), next turn, craft info, crew, equipment (Left/Right move items), armor, armor picker, soldier info.
 - `src/Access/Controls.{h,cpp}`: the one `ControlType` registry and drive helpers. `Controls::click` runs a surface's own press/release/click handlers with a synthetic left click, so sounds and side effects match the mouse. `clickRow` selects a `TextList` row the way hovering would, then clicks it, because the game's list handlers read `getSelectedRow()`. Selectable list rows get Enter as left click and Backspace as right click.
 - Widget accessors added for the layer: `ComboBox` (`getOptionCount`, `getSelectedText`, `notifyChange`), `Slider` (`getMin`, `getMax`, `notifyChange`), `TextList` (`setSelectedRow`, `getCellCount`, `isSelectable`). `notifyChange` runs the change handler with a null action.
+- `src/Access/Battle.{h,cpp}`: the battle map layer. Not a graph screen: the navigator hands it keys and ticks only when no recipe matches and `BattlescapeState` is on top. It keeps a tile cursor (map coordinates; `Map::setSelectorTile` mirrors it for sighted viewers), describes tiles (unit, items, terrain from `MapData` properties since pieces have no names, then walls per edge), and runs three differs: selected unit (cursor jumps to it), newly visible hostiles (queued), and "our action finished" (queued TUs left). Enter/Backspace call `primaryAction`/`secondaryAction`; it forces `Options::battleNewPreviewPath` on so the first Enter previews and speaks the cost.
+  - Map facts: tiles are `x, y, z` with z 0 the ground; direction 0 is north (-y), clockwise. A tile only owns its west and north walls, so east/south walls are the neighbour's west/north. `isDiscovered(2)` = tile seen; `(0)`/`(1)` = its west/north wall seen from the far side. Big-wall objects (`Pathfinding::bigWallTypes`) can block an edge too.
+  - `Pathfinding::getTotalTUCost` is wrong after an A* search (it's the last neighbour tried), so `pathCost` walks the path with `getTUCost` like `previewPath` does.
 - `src/main.cpp`: `Speech::init()` and `Navigator::init()` after `Options::init`, and `Speech::shutdown()` on exit.
 
 ### Keys
 
 - Graph screens: arrows move (Left/Right adjust a slider-like control), Home/End jump to the ends, Tab/Shift+Tab cycle zones, Enter activates, Backspace is the secondary action, Space reads the tooltip, Ctrl+L re-reads the focus with its context, Escape is the screen's `back` if it has one (otherwise it goes to the game).
+- Battle map (Battlescape on top, no popup): arrows move the cursor by compass (Up = north), Page Up/Down change level, Home returns to the selected soldier, Enter = left click on the cursor tile (preview, then move; fires while targeting), Backspace = right click (cancel preview/targeting, else turn or open a door; this also takes Backspace away from the game's end turn), Escape cancels targeting, Tab/Shift+Tab cycle soldiers, Space = soldier status, Ctrl+L = cursor tile in full with offset and coordinates, Ctrl+E twice = end turn. Left Shift alone is swallowed (the game's previous-soldier key). Game warnings are spoken from `BattlescapeState::warning`.
 - Everywhere: Ctrl+R repeats the last speech.
 - Free in OpenXcom's own bindings: F6, Ctrl+R, Ctrl+L. F1 to F5 and F7 to F12 are taken.
 
@@ -84,7 +88,7 @@ The design follows the Graph A11y Kernel spec at `C:\git\sims2access\docs\graph-
 - Screen stack: `Game::pushState`/`popState`. A screen recipe's `IsActive` is a `dynamic_cast` on the top state.
 - Battlescape input: `BattlescapeState::handle`. It ignores input while the cursor is hidden. Bindings are in `Engine/Options.inc.h`; the arrow keys belong to `Camera::keyboardPress`.
 - Tile cursor: `Map::setSelectorPosition` takes screen pixels, so add a map-coordinate setter. `BattlescapeGame::primaryAction(Position)` and `secondaryAction(Position)` are what a click does.
-- Path cost: `Pathfinding::calculate` and `getTotalTUCost`. Hit chance: `BattleUnit::getFiringAccuracy`.
+- Path cost: `Pathfinding::calculate`, then sum `getTUCost` along `getPath()` (not `getTotalTUCost`). Hit chance: `BattleUnit::getFiringAccuracy`.
 - Newly spotted units: `BattleUnit::addToVisibleUnits` returns true on first sight.
 - Events: the `BattleState` subclasses (`UnitWalkBState`, `ProjectileFlyBState`, `ExplosionBState`, `UnitDieBState`, and so on), plus `BattlescapeGame::checkForCasualties` and `endTurn`.
 - Warnings: `BattlescapeState::warning`. Selection changes: `BattlescapeState::updateSoldierInfo`.
@@ -94,7 +98,7 @@ The design follows the Graph A11y Kernel spec at `C:\git\sims2access\docs\graph-
 1. ~~Speech wrapper, text cleanup, transcript, vocabulary module, C++17~~ (done)
 2. ~~Graph kernel, navigator, key filter in `Game::run`, screen manager over the `State` stack; prove it on the main menu~~ (done)
 3. ~~New Battle setup screen, Equip Craft (crew, equipment, armor, soldier info), briefing, next turn~~ (done)
-4. Map exploration layer: tile cursor, confirm via `primaryAction`, selection/cursor differ, parity gating
+4. Map exploration layer: tile cursor, confirm via `primaryAction`, selection/cursor differ, parity gating (first pass in; next: the scanner, a categorised point-of-interest list)
 5. Action menu, unit and enemy list overlays, event narration
 6. Inventory
 

@@ -9,6 +9,7 @@ set ( access_src
   Access/Controls.cpp
   Access/Navigator.cpp
   Access/Screens.cpp
+  Access/Battle.cpp
   Access/Graph/GraphAnnouncer.cpp
   Access/Graph/GraphBuilder.cpp
   Access/Graph/KeyGraph.cpp

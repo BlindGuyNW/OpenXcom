@@ -22,11 +22,13 @@
 #include <map>
 #include <memory>
 #include <set>
+#include "Battle.h"
 #include "Screens.h"
 #include "Speech.h"
 #include "Vocab.h"
 #include "Graph/GraphAnnouncer.hpp"
 #include "Graph/KeyGraph.hpp"
+#include "../Battlescape/BattlescapeState.h"
 #include "../Engine/Game.h"
 #include "../Engine/Logger.h"
 #include "../Engine/State.h"
@@ -199,6 +201,14 @@ namespace
 		say(text, true);
 	}
 
+	/// The Battlescape, when it's the top state and has finished init(); the map layer's only home.
+	BattlescapeState *battleOnTop()
+	{
+		if (!_game->isStateInitialized())
+			return 0;
+		return dynamic_cast<BattlescapeState *>(topState());
+	}
+
 	/// Is a text field taking typing? Then the layer stands down entirely (spec 8).
 	bool textFieldLive()
 	{
@@ -317,8 +327,15 @@ bool handleEvent(Game *game, const SDL_Event &ev)
 	else if (!alt)
 	{
 		sync();
-		if (_graph && !textFieldLive())
-			claimed = dispatch(key, shift, ctrl);
+		if (_graph)
+		{
+			if (!textFieldLive())
+				claimed = dispatch(key, shift, ctrl);
+		}
+		else if (BattlescapeState *battle = battleOnTop())
+		{
+			guarded("battle key", [&] { claimed = Battle::handleKey(battle, key, shift, ctrl); });
+		}
 	}
 	if (claimed)
 		_swallowed.insert(key);
@@ -333,6 +350,12 @@ void update(Game *game)
 	if (!game->isStateInitialized())
 		return;
 	sync();
+	if (!_screen)
+	{
+		if (BattlescapeState *battle = battleOnTop())
+			guarded("battle update", [&] { Battle::update(battle); });
+		return;
+	}
 	if (!_graph || !_graph->Rerender())
 		return;
 	GraphNode *node = _graph->CurrentNode();

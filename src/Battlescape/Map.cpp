@@ -1320,6 +1320,20 @@ void Map::setSelectorPosition(int mx, int my)
 }
 
 /**
+ * Sets the selector to a tile by map coordinates.
+ * @param pos Map position; z is ignored, the selector follows the view level.
+ */
+void Map::setSelectorTile(Position pos)
+{
+	if (_selectorX != pos.x || _selectorY != pos.y)
+	{
+		_selectorX = pos.x;
+		_selectorY = pos.y;
+		_redraw = true;
+	}
+}
+
+/**
  * Handles animating tiles. 8 Frames per animation.
  * @param redraw Redraw the battlescape?
  */

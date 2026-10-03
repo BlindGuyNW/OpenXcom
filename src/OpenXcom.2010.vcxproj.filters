@@ -951,6 +951,9 @@
     <ClCompile Include="Access\Screens.cpp">
       <Filter>Access</Filter>
     </ClCompile>
+    <ClCompile Include="Access\Battle.cpp">
+      <Filter>Access</Filter>
+    </ClCompile>
     <ClCompile Include="Access\Graph\GraphAnnouncer.cpp">
       <Filter>Access\Graph</Filter>
     </ClCompile>
@@ -1961,6 +1964,9 @@
       <Filter>Access</Filter>
     </ClInclude>
     <ClInclude Include="Access\Screens.h">
+      <Filter>Access</Filter>
+    </ClInclude>
+    <ClInclude Include="Access\Battle.h">
       <Filter>Access</Filter>
     </ClInclude>
     <ClInclude Include="Access\Graph\ControlId.hpp">
