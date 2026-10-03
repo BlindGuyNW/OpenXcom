@@ -53,7 +53,7 @@ const int TileEngine::heightFromCenter[11] = {0,-2,+2,-4,+4,-6,+6,-8,+8,-12,+12}
  * @param save Pointer to SavedBattleGame object.
  * @param voxelData List of voxel data.
  */
-TileEngine::TileEngine(SavedBattleGame *save, std::vector<Uint16> *voxelData) : _save(save), _voxelData(voxelData), _personalLighting(true), _cacheTile(0), _cacheTileBelow(0)
+TileEngine::TileEngine(SavedBattleGame *save, std::vector<Uint16> *voxelData) : _save(save), _voxelData(voxelData), _personalLighting(true), _cacheTile(0), _cacheTileBelow(0), _lastHitUnit(0), _lastHitPart(0)
 {
 	_cacheTilePos = Position(-1,-1,-1);
 }
@@ -1105,6 +1105,8 @@ bool TileEngine::tryReaction(BattleUnit *unit, BattleUnit *target, int attackTyp
  */
 BattleUnit *TileEngine::hit(Position center, int power, ItemDamageType type, BattleUnit *unit)
 {
+	_lastHitUnit = 0;
+	_lastHitPart = 0;
 	Tile *tile = _save->getTile(Position(center.x/16, center.y/16, center.z/24));
 	if (!tile)
 	{
@@ -1119,6 +1121,7 @@ BattleUnit *TileEngine::hit(Position center, int power, ItemDamageType type, Bat
 	{
 		// power 25% to 75%
 		const int rndPower = RNG::generate(power/4, (power*3)/4);
+		_lastHitPart = tile->getMapData((TilePart)part);
 		if (part == V_OBJECT && rndPower >= tile->getMapData(O_OBJECT)->getArmor() &&
 			_save->getMissionType() == "STR_BASE_DEFENSE" && tile->getMapData(O_OBJECT)->isBaseModule())
 		{
@@ -1152,6 +1155,7 @@ BattleUnit *TileEngine::hit(Position center, int power, ItemDamageType type, Bat
 		}
 		if (bu && bu->getHealth() != 0 && bu->getStunlevel() < bu->getHealth())
 		{
+			_lastHitUnit = bu;
 			const int sz = bu->getArmor()->getSize() * 8;
 			const Position target = bu->getPosition() * Position(16,16,24) + Position(sz,sz, bu->getFloatHeight() - tile->getTerrainLevel());
 			const Position relative = (center - target) - Position(0,0,verticaloffset);

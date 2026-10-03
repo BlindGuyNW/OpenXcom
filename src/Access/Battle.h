@@ -23,6 +23,8 @@ namespace OpenXcom
 {
 
 class BattlescapeState;
+class BattleUnit;
+class SavedBattleGame;
 
 /**
  * The battle map exploration layer: a keyboard tile cursor over the Battlescape.
@@ -48,6 +50,14 @@ namespace Battle
 	bool handleKey(BattlescapeState *state, SDLKey key, bool shift, bool ctrl);
 	/// Per-frame tick: the selection, spotting and action-result differs.
 	void update(BattlescapeState *state);
+
+	/// Shot results. ExplosionBState brackets each bullet hit or explosion with these:
+	/// begin snapshots every unit's health, end says who was hit
+	/// ("Sectoid Soldier hit", "missed, hit wooden fence", "explosion hits no one").
+	void beginImpact(SavedBattleGame *save);
+	void endImpact(SavedBattleGame *save, BattleUnit *attacker, bool areaEffect);
+	/// A shot that left the map without hitting anything.
+	void shotOffMap(SavedBattleGame *save);
 }
 
 }

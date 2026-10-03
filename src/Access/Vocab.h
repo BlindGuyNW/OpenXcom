@@ -136,6 +136,10 @@ namespace Vocab
 		DEBRIEF_ROW,
 		STAT_GAIN,
 		NO_STAT_GAINS,
+		UNIT_HIT,
+		MISSED,
+		MISSED_INTO,
+		BLAST_NO_ONE,
 		COUNT
 	};
 

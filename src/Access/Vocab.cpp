@@ -133,6 +133,10 @@ namespace
 		"{0}: {1}, score {2}",
 		"{0} {1}",
 		"no change",
+		"{0} hit",
+		"missed",
+		"missed, hit {0}",
+		"explosion hits no one",
 	};
 }
 

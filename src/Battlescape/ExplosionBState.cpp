@@ -32,6 +32,7 @@
 #include "../Mod/RuleItem.h"
 #include "../Mod/Armor.h"
 #include "../Engine/RNG.h"
+#include "../Access/Battle.h"
 
 namespace OpenXcom
 {
@@ -230,13 +231,17 @@ void ExplosionBState::explode()
 
 		if (_areaOfEffect)
 		{
+			Battle::beginImpact(save);
 			save->getTileEngine()->explode(_center, _power, _item->getRules()->getDamageType(), _item->getRules()->getExplosionRadius(), _unit);
+			Battle::endImpact(save, _unit, true);
 		}
 		else if (!_cosmetic)
 		{
 			ItemDamageType type = _item->getRules()->getDamageType();
 
+			Battle::beginImpact(save);
 			victim = save->getTileEngine()->hit(_center, _power, type, _unit);
+			Battle::endImpact(save, _unit, false);
 		}
 		// check if this unit turns others into zombies
 		if (!_item->getRules()->getZombieUnit().empty()

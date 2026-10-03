@@ -79,6 +79,15 @@ namespace
 	Position _shotFrom, _shotAt;
 	Uint32 _shotTime = 0;
 	const Uint32 BURST_WINDOW = 2000;
+	/// Whether the last shot's result is spoken: ours, or one a sighted player watched.
+	bool _reportShot = false;
+	/// Every unit's state just before a hit or explosion, to say who it hurt.
+	struct UnitBefore
+	{
+		int health, stun;
+		bool shown;
+	};
+	std::map<BattleUnit *, UnitBefore> _before;
 	/// We started an action; speak the result once the game is idle again.
 	bool _awaiting = false;
 	/// When Ctrl+E was first pressed; a second press soon after ends the turn.
@@ -911,6 +920,8 @@ namespace
 		_wasTargeting = false;
 		_projectile = 0;
 		_shotTime = 0;
+		_reportShot = false;
+		_before.clear();
 		_scanCategory = SCAN_SOLDIERS;
 		_scanCurrent.unit = 0;
 		_scanCurrent.tag = -1;
@@ -1091,7 +1102,12 @@ void update(BattlescapeState *state)
 	// Shots, spoken as they leave so they come before any hit or death.
 	Projectile *projectile = state->getMap()->getProjectile();
 	if (projectile && projectile != _projectile)
+	{
+		BattleUnit *shooter = projectile->getActor();
+		Tile *targetTile = save->getTile(projectile->getTarget());
+		_reportShot = (shooter && shooter->getFaction() == FACTION_PLAYER) || unitShown(shooter) || (targetTile && unitShown(targetTile->getUnit()));
 		narrateShot(state, projectile);
+	}
 	_projectile = projectile;
 
 	// Aiming started: say what and how well, then put the cursor on the nearest enemy.
@@ -1107,6 +1123,83 @@ void update(BattlescapeState *state)
 		if (_soldier && !_soldier->isOut())
 			say(Vocab::format(Vocab::TIME_UNITS_LEFT, { num(_soldier->getTimeUnits()) }), false);
 	}
+}
+
+void beginImpact(SavedBattleGame *save)
+{
+	_before.clear();
+	if (save != _battle)
+		return;
+	for (BattleUnit *unit : *save->getUnits())
+		_before[unit] = { unit->getHealth(), unit->getStunlevel(), unitShown(unit) };
+}
+
+namespace
+{
+	/// One line for a shown unit an impact reached, or nothing if it went down
+	/// (the killed/unconscious narration follows). Our units' wounds come with their health.
+	std::string hitText(BattleUnit *unit, const UnitBefore &before)
+	{
+		if (unit->getHealth() == 0 || unit->getStunlevel() >= unit->getHealth())
+			return std::string();
+		std::string name = unit->getName(State::getGamePtr()->getLanguage());
+		if (unit->getFaction() == FACTION_PLAYER && unit->getHealth() < before.health)
+		{
+			_health[unit] = unit->getHealth();
+			return Vocab::format(Vocab::UNIT_WOUNDED, { name, num(unit->getHealth()) });
+		}
+		return Vocab::format(Vocab::UNIT_HIT, { name });
+	}
+}
+
+void endImpact(SavedBattleGame *save, BattleUnit *attacker, bool areaEffect)
+{
+	if (save != _battle || _before.empty())
+		return;
+	bool report = _reportShot || (attacker && attacker->getFaction() == FACTION_PLAYER);
+	if (areaEffect)
+	{
+		// Everyone shown that the blast hurt; a sighted player sees them flinch or fall.
+		bool anyone = false;
+		for (const auto &b : _before)
+		{
+			BattleUnit *unit = b.first;
+			if (!b.second.shown || (unit->getHealth() >= b.second.health && unit->getStunlevel() <= b.second.stun))
+				continue;
+			anyone = true;
+			std::string text = hitText(unit, b.second);
+			if (!text.empty())
+				say(text, false);
+		}
+		if (!anyone && report)
+			say(Vocab::get(Vocab::BLAST_NO_ONE), false);
+		_reportShot = false;
+	}
+	else
+	{
+		TileEngine *engine = save->getTileEngine();
+		BattleUnit *unit = engine->getLastHitUnit();
+		std::map<BattleUnit *, UnitBefore>::const_iterator b = unit ? _before.find(unit) : _before.end();
+		if (b != _before.end() && b->second.shown)
+		{
+			std::string text = hitText(unit, b->second);
+			if (!text.empty())
+				say(text, false);
+		}
+		else if (report)
+		{
+			// A unit we can't see counts as a miss: all a sighted player sees is the impact.
+			std::string piece = unit ? std::string() : TerrainNames::get(engine->getLastHitPart());
+			say(piece.empty() ? Vocab::get(Vocab::MISSED) : Vocab::format(Vocab::MISSED_INTO, { piece }), false);
+		}
+	}
+	_before.clear();
+}
+
+void shotOffMap(SavedBattleGame *save)
+{
+	if (save == _battle && _reportShot)
+		say(Vocab::get(Vocab::MISSED), false);
 }
 
 }

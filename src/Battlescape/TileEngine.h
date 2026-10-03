@@ -50,6 +50,8 @@ private:
 	Tile *_cacheTile;
 	Tile *_cacheTileBelow;
 	Position _cacheTilePos;
+	BattleUnit *_lastHitUnit;
+	MapData *_lastHitPart;
 public:
 	static const int MAX_DARKNESS_TO_SEE_UNITS = 9;
 	/// Creates a new TileEngine class.
@@ -72,6 +74,9 @@ public:
 	void calculateUnitLighting();
 	/// Handles bullet/weapon hits.
 	BattleUnit *hit(Position center, int power, ItemDamageType type, BattleUnit *unit);
+	/// What the last hit() struck: a unit, or else a terrain piece (either may be null). For the accessibility layer.
+	BattleUnit *getLastHitUnit() const { return _lastHitUnit; }
+	MapData *getLastHitPart() const { return _lastHitPart; }
 	/// Handles explosions.
 	void explode(Position center, int power, ItemDamageType type, int maxRadius, BattleUnit *unit = 0);
 	/// Checks if a destroyed tile starts an explosion.

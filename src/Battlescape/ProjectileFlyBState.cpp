@@ -37,6 +37,7 @@
 #include "BattlescapeState.h"
 #include "../Savegame/BattleUnitStatistics.h"
 #include "../fmath.h"
+#include "../Access/Battle.h"
 
 namespace OpenXcom
 {
@@ -561,6 +562,10 @@ void ProjectileFlyBState::think()
 					_action.weapon->setAmmoItem(0);
 				}
 
+				if (_projectileImpact == V_OUTOFBOUNDS)
+				{
+					Battle::shotOffMap(_parent->getSave());
+				}
 				if (_projectileImpact != V_OUTOFBOUNDS)
 				{
 					int offset = 0;
