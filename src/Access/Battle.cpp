@@ -272,6 +272,8 @@ namespace
 		MapData *floor = tile->getMapData(O_FLOOR);
 		if (floor && floor->isGravLift())
 			parts.push_back(Vocab::get(Vocab::LIFT));
+		if (floor && floor->getSpecialType() == START_POINT)
+			parts.push_back(Vocab::get(Vocab::CRAFT_AREA));
 		if (floor && floor->getSpecialType() == END_POINT)
 			parts.push_back(Vocab::get(Vocab::EXIT_AREA));
 		if (tile->getSmoke())
@@ -575,7 +577,11 @@ namespace
 				else if (category == SCAN_EXITS)
 				{
 					MapData *floor = tile->getMapData(O_FLOOR);
-					if (floor && floor->getSpecialType() == END_POINT)
+					// Entrance tiles (the craft) are where soldiers must stand to escape an abort;
+					// exit tiles only lead to the next stage of a multi-stage mission.
+					if (floor && floor->getSpecialType() == START_POINT)
+						out.push_back({ Vocab::get(Vocab::CRAFT_AREA), tile->getPosition(), 0, 0 });
+					else if (floor && floor->getSpecialType() == END_POINT)
 						out.push_back({ Vocab::get(Vocab::EXIT_AREA), tile->getPosition(), 0, 0 });
 				}
 			}

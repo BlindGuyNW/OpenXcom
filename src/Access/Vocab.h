@@ -74,6 +74,7 @@ namespace Vocab
 		NO_FLOOR,
 		LIFT,
 		EXIT_AREA,
+		CRAFT_AREA,
 		SMOKE,
 		FIRE,
 		MORE_ITEMS,

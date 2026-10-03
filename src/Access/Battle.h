@@ -40,7 +40,7 @@ class BattlescapeState;
  *
  * The scanner: Period/Comma step through the current category nearest first,
  * Shift+Period/Comma change category (soldiers, enemies, civilians, items,
- * doors, exit area), Slash jumps the cursor to the current entry.
+ * doors, exits: craft and stage exit tiles), Slash jumps the cursor to the current entry.
  */
 namespace Battle
 {
