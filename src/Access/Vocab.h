@@ -143,6 +143,7 @@ namespace Vocab
 		SOLID,
 		UNIT_NUMBER,
 		OUT_OF_SIGHT,
+		UNIT_BLEEDING,
 		COUNT
 	};
 

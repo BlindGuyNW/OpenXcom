@@ -1125,7 +1125,8 @@ void update(BattlescapeState *state)
 		{
 			std::map<BattleUnit *, int>::iterator h = _health.find(unit);
 			if (h != _health.end() && unit->getHealth() < h->second && unit->getHealth() > 0)
-				say(Vocab::format(Vocab::UNIT_WOUNDED, { unitLabel(unit), num(unit->getHealth()) }), false);
+				// Hits are spoken at impact, so a drop here is mostly fatal wounds bleeding at the turn's start.
+				say(Vocab::format(unit->getFatalWounds() > 0 ? Vocab::UNIT_BLEEDING : Vocab::UNIT_WOUNDED, { unitLabel(unit), num(unit->getHealth()) }), false);
 			_health[unit] = unit->getHealth();
 		}
 	}

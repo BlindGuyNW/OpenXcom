@@ -140,6 +140,7 @@ namespace
 		"solid",
 		"{0} {1}",
 		"lost sight of {0}",
+		"{0} bleeding, health {1}",
 	};
 }
 
