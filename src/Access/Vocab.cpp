@@ -110,9 +110,16 @@ namespace
 		"{0}, choose a target",
 		"in view",
 		"out of view",
+		"friendly",
 		"{0} killed",
 		"{0} unconscious",
 		"{0} hit, health {1}",
+		"{0}, primed, {1}",
+		"holding {0}",
+		"{0}, held",
+		"{0} loaded",
+		"{0} to {1}",
+		"put back",
 	};
 }
 

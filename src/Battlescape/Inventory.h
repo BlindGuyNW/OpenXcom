@@ -103,6 +103,18 @@ public:
 	void showWarning(const std::string &msg);
 	/// Show priming warnings on grenades.
 	void drawPrimers();
+	/// Gets the unit whose inventory is shown (for the accessibility layer).
+	BattleUnit *getSelectedUnit() const { return _selUnit; }
+	/// Are moves paid for in time units (in battle) rather than free (pre-battle)?
+	bool getTuMode() const { return _tu; }
+	/// Keyboard pickup: holds an item, as a left click on it would.
+	bool pickUp(BattleItem *item);
+	/// Keyboard drop: loads the held item into target if target is a weapon that takes it,
+	/// otherwise puts it in the first free place in slot (or on the ground). Spends TUs like the mouse.
+	/// Returns 1 if placed, 2 if loaded, 0 if it failed (a warning has been shown).
+	int placeSelected(RuleInventory *slot, BattleItem *target);
+	/// Keyboard cancel: returns the held item to where it came from, as a right click would.
+	void cancelSelected();
 };
 
 }

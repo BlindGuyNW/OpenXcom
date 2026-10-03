@@ -47,6 +47,13 @@
 #include "../Savegame/BattleItem.h"
 #include "../Savegame/BattleUnit.h"
 #include "../Battlescape/InventoryState.h"
+#include "../Battlescape/Inventory.h"
+#include "../Engine/Game.h"
+#include "../Mod/Mod.h"
+#include "../Mod/RuleInventory.h"
+#include "../Savegame/SavedGame.h"
+#include "../Savegame/Tile.h"
+#include "Speech.h"
 #include "../Battlescape/NextTurnState.h"
 #include "../Engine/InteractiveSurface.h"
 #include "../Engine/LocalizedText.h"
@@ -297,7 +304,95 @@ AccessScreen briefing()
 	return s;
 }
 
-/// The equip screen. Only its navigation buttons for now; the items themselves come later.
+/// An item as the inventory names it: unconscious units by name, unresearched alien items as
+/// artifacts, then rounds loaded and a primed grenade's timer.
+std::string inventoryItemText(State *state, BattleItem *item)
+{
+	Game *game = State::getGamePtr();
+	std::string name;
+	if (item->getUnit() && item->getUnit()->getStatus() == STATUS_UNCONSCIOUS)
+		name = item->getUnit()->getName(game->getLanguage());
+	else if (game->getSavedGame()->isResearched(item->getRules()->getRequirements()))
+		name = state->tr(item->getRules()->getName());
+	else
+		name = state->tr("STR_ALIEN_ARTIFACT");
+	if (item->needsAmmo())
+	{
+		BattleItem *ammo = item->getAmmoItem();
+		name = ammo ? Vocab::format(Vocab::ROUNDS, { name, std::to_string(ammo->getAmmoQuantity()) }) : Vocab::format(Vocab::NO_AMMO, { name });
+	}
+	else if (item->getRules()->getBattleType() == BT_AMMO)
+	{
+		name = Vocab::format(Vocab::ROUNDS, { name, std::to_string(item->getAmmoQuantity()) });
+	}
+	if (item->getFuseTimer() >= 0)
+		name = Vocab::format(Vocab::PRIMED, { name, std::to_string(item->getFuseTimer()) });
+	return name;
+}
+
+/// The body slots in a fixed reading order, then any a mod adds, then the ground.
+std::vector<RuleInventory *> inventorySlots(Mod *mod)
+{
+	static const char *order[] = { "STR_RIGHT_HAND", "STR_LEFT_HAND", "STR_BELT", "STR_BACK_PACK",
+		"STR_RIGHT_SHOULDER", "STR_LEFT_SHOULDER", "STR_RIGHT_LEG", "STR_LEFT_LEG" };
+	std::vector<RuleInventory *> slots;
+	for (const char *id : order)
+	{
+		RuleInventory *slot = mod->getInventory(id);
+		if (slot)
+			slots.push_back(slot);
+	}
+	RuleInventory *ground = 0;
+	for (auto &i : *mod->getInventories())
+	{
+		if (i.second->getType() == INV_GROUND)
+			ground = i.second;
+		else if (std::find(slots.begin(), slots.end(), i.second) == slots.end())
+			slots.push_back(i.second);
+	}
+	if (ground)
+		slots.push_back(ground);
+	return slots;
+}
+
+/// Speaks the outcome of a keyboard inventory move, with TUs left when moves cost them.
+void sayInventoryResult(Inventory *inv, const std::string &text)
+{
+	std::string s = text;
+	BattleUnit *unit = inv->getSelectedUnit();
+	if (inv->getTuMode() && unit)
+		s += ", " + Vocab::format(Vocab::TIME_UNITS_LEFT, { std::to_string(unit->getTimeUnits()) });
+	Speech::say(s, true);
+}
+
+/// Enter on an item or an empty slot: pick the item up, or put the held item here
+/// (loading it if this is a weapon that takes it).
+std::function<void()> inventoryActivate(State *state, RuleInventory *slot, BattleItem *item)
+{
+	return [state, slot, item]
+	{
+		InventoryState *invState = static_cast<InventoryState *>(state);
+		Inventory *inv = invState->getInventory();
+		BattleItem *held = inv->getSelectedItem();
+		if (!held)
+		{
+			if (item && inv->pickUp(item))
+				Speech::say(Vocab::format(Vocab::HOLDING, { inventoryItemText(state, item) }), true);
+			return;
+		}
+		std::string heldName = inventoryItemText(state, held);
+		int result = inv->placeSelected(slot, item);
+		invState->updateStats();
+		if (result == 2)
+			sayInventoryResult(inv, Vocab::format(Vocab::LOADED, { inventoryItemText(state, item) }));
+		else if (result == 1)
+			sayInventoryResult(inv, Vocab::format(Vocab::PLACED, { heldName, state->tr(slot->getId()) }));
+	};
+}
+
+/// A soldier's inventory: body slots (one list, each slot announced as you enter it),
+/// the ground, then the buttons. Enter picks up and puts down; Escape puts a held item back,
+/// or closes the screen.
 AccessScreen inventory()
 {
 	AccessScreen s;
@@ -307,8 +402,60 @@ AccessScreen inventory()
 	s.name = [](State *state) { return Vocab::format(Vocab::INVENTORY, { firstText(state) }); };
 	s.build = [](GraphBuilder &b, State *state)
 	{
+		Inventory *inv = static_cast<InventoryState *>(state)->getInventory();
+		BattleUnit *unit = inv->getSelectedUnit();
+		if (unit)
+		{
+			std::vector<RuleInventory *> slots = inventorySlots(State::getGamePtr()->getMod());
+			b.BeginStop("body");
+			for (RuleInventory *slot : slots)
+			{
+				std::vector<BattleItem *> items;
+				if (slot->getType() == INV_GROUND)
+				{
+					b.BeginStop("ground");
+					if (unit->getTile())
+						items = *unit->getTile()->getInventory();
+				}
+				else
+				{
+					for (BattleItem *item : *unit->getInventory())
+					{
+						if (item->getSlot() == slot)
+							items.push_back(item);
+					}
+				}
+				std::stable_sort(items.begin(), items.end(), [](BattleItem *a, BattleItem *c)
+				{
+					return a->getSlotY() != c->getSlotY() ? a->getSlotY() < c->getSlotY() : a->getSlotX() < c->getSlotX();
+				});
+				b.PushContext(state->tr(slot->getId()));
+				for (BattleItem *item : items)
+				{
+					NodeVtable v;
+					v.Type = &Controls::button();
+					v.Announcements.push_back(NodeAnnouncement([state, inv, item]
+					{
+						std::string text = inventoryItemText(state, item);
+						return inv->getSelectedItem() == item ? Vocab::format(Vocab::HELD, { text }) : text;
+					}, false, AnnouncementKinds::Label));
+					v.OnActivate = inventoryActivate(state, slot, item);
+					b.AddItem(ControlId::Referenced(item, "item:" + std::to_string(item->getId())), v);
+				}
+				if (items.empty())
+				{
+					NodeVtable v;
+					v.Announcements.push_back(NodeAnnouncement([] { return Vocab::get(Vocab::EMPTY); }, false, AnnouncementKinds::Label));
+					v.OnActivate = inventoryActivate(state, slot, 0);
+					b.AddItem(ControlId::Referenced(slot, "empty:" + slot->getId()), v);
+				}
+				b.PopContext();
+			}
+		}
+
+		b.BeginStop("buttons");
 		// The image buttons are told apart by their tooltips, which name them for the mouse too.
-		const char *wanted[] = { "STR_OK", "STR_PREVIOUS_UNIT", "STR_NEXT_UNIT" };
+		const char *wanted[] = { "STR_OK", "STR_PREVIOUS_UNIT", "STR_NEXT_UNIT", "STR_UNLOAD_WEAPON" };
 		for (const char *tooltip : wanted)
 		{
 			for (Surface *surface : state->getSurfaces())
@@ -317,11 +464,23 @@ AccessScreen inventory()
 				if (!btn || !btn->getVisible() || btn->getTooltip() != tooltip)
 					continue;
 				NodeVtable v = Controls::labelledButton(state, btn, state->tr(tooltip));
-				if (btn->getTooltip() != "STR_OK")
+				if (btn->getTooltip() == "STR_PREVIOUS_UNIT" || btn->getTooltip() == "STR_NEXT_UNIT")
 					v.StateText = [state] { return firstText(state); };
 				b.AddItem(ControlId::Referenced(btn, tooltip), v);
 			}
 		}
+	};
+	s.back = [](State *state)
+	{
+		InventoryState *invState = static_cast<InventoryState *>(state);
+		Inventory *inv = invState->getInventory();
+		if (inv->getSelectedItem())
+		{
+			inv->cancelSelected();
+			Speech::say(Vocab::get(Vocab::PUT_BACK), true);
+			return;
+		}
+		invState->btnOkClick(0);
 	};
 	return s;
 }

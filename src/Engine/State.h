@@ -102,6 +102,8 @@ public:
 	void applyBattlescapeTheme();
 	/// Sets game object pointer
 	static void setGamePtr(Game* game);
+	/// Gets game object pointer (for the accessibility layer).
+	static Game *getGamePtr() { return _game; }
 	/// Sets a modal surface.
 	void setModal(InteractiveSurface *surface);
 	/// Changes a set of colors on the state's 8bpp palette.

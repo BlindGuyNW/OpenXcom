@@ -21,6 +21,7 @@
 #include <string>
 #include "../Engine/Timer.h"
 #include "../Interface/Text.h"
+#include "../Access/Speech.h"
 
 namespace OpenXcom
 {
@@ -106,6 +107,7 @@ void WarningMessage::setPalette(SDL_Color *colors, int firstcolor, int ncolors)
 void WarningMessage::showMessage(const std::string &msg)
 {
 	_text->setText(msg);
+	Speech::say(msg, true);
 	_fade = 0;
 	_redraw = true;
 	setVisible(true);

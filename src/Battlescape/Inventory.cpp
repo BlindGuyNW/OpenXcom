@@ -1039,4 +1039,115 @@ void Inventory::drawPrimers()
 	_animFrame++;
 }
 
+/**
+ * Keyboard pickup: holds an item, as a left click on it would.
+ * @param item The item to hold.
+ * @return True if the item is now held.
+ */
+bool Inventory::pickUp(BattleItem *item)
+{
+	if (_selUnit == 0 || _selItem != 0 || item == 0 || item->getRules()->isFixed())
+		return false;
+	setSelectedItem(item);
+	if (item->getFuseTimer() >= 0)
+	{
+		_warning->showMessage(_game->getLanguage()->getString("STR_GRENADE_IS_ACTIVATED"));
+	}
+	return _selItem == item;
+}
+
+/**
+ * Keyboard drop: loads the held item into a weapon, or puts it in a slot.
+ * Mirrors the mouse drop in mouseClick, but the place in the slot is found
+ * the way fitItem finds one instead of from the mouse position.
+ * @param slot The slot to put the item in.
+ * @param target The item the player chose in that slot, if any.
+ * @return 1 if placed, 2 if loaded into target, 0 if it failed.
+ */
+int Inventory::placeSelected(RuleInventory *slot, BattleItem *target)
+{
+	if (_selUnit == 0 || _selItem == 0 || slot == 0)
+		return 0;
+	BattleItem *item = _selItem;
+
+	// Held ammo on a weapon that takes it: load it, as dropping it on the weapon does.
+	if (target != 0 && target != item)
+	{
+		std::vector<std::string> *ammo = target->getRules()->getCompatibleAmmo();
+		if (std::find(ammo->begin(), ammo->end(), item->getRules()->getType()) != ammo->end())
+		{
+			if (target->getAmmoItem() != 0)
+			{
+				_warning->showMessage(_game->getLanguage()->getString("STR_WEAPON_IS_ALREADY_LOADED"));
+				return 0;
+			}
+			if (_tu && !_selUnit->spendTimeUnits(15))
+			{
+				_warning->showMessage(_game->getLanguage()->getString("STR_NOT_ENOUGH_TIME_UNITS"));
+				return 0;
+			}
+			bool fromGround = item->getSlot()->getType() == INV_GROUND;
+			moveItem(item, 0, 0, 0);
+			target->setAmmoItem(item);
+			item->moveToOwner(0);
+			setSelectedItem(0);
+			_game->getMod()->getSoundByDepth(_depth, Mod::ITEM_RELOAD)->play();
+			if (fromGround || target->getSlot()->getType() == INV_GROUND)
+			{
+				arrangeGround(false);
+			}
+			return 2;
+		}
+	}
+
+	// Back where it came from: nothing to do.
+	if (slot == item->getSlot())
+	{
+		cancelSelected();
+		return 1;
+	}
+
+	bool fromGround = item->getSlot()->getType() == INV_GROUND;
+	if (slot->getType() == INV_GROUND)
+	{
+		if (_tu && !_selUnit->spendTimeUnits(item->getSlot()->getCost(slot)))
+		{
+			_warning->showMessage(_game->getLanguage()->getString("STR_NOT_ENOUGH_TIME_UNITS"));
+			return 0;
+		}
+		moveItem(item, slot, 0, 0);
+		setSelectedItem(0);
+		_game->getMod()->getSoundByDepth(_depth, Mod::ITEM_DROP)->play();
+		arrangeGround(false);
+		return 1;
+	}
+
+	std::string warning = "STR_NOT_ENOUGH_SPACE";
+	if (!fitItem(slot, item, warning))
+	{
+		_warning->showMessage(_game->getLanguage()->getString(warning));
+		return 0;
+	}
+	setSelectedItem(0);
+	if (fromGround)
+	{
+		arrangeGround(false);
+	}
+	return 1;
+}
+
+/**
+ * Keyboard cancel: returns the held item to where it came from.
+ */
+void Inventory::cancelSelected()
+{
+	if (_selItem == 0)
+		return;
+	if (_selItem->getSlot()->getType() == INV_GROUND)
+	{
+		_stackLevel[_selItem->getSlotX()][_selItem->getSlotY()] += 1;
+	}
+	setSelectedItem(0);
+}
+
 }

@@ -395,8 +395,10 @@ namespace
 		if (!action->targeting || !action->actor || !tile || !tile->isDiscovered(2))
 			return std::string();
 		BattleUnit *unit = tile->getUnit();
-		if (!unitShown(unit) || unit->getFaction() == FACTION_PLAYER)
+		if (!unitShown(unit) || unit == action->actor)
 			return std::string();
+		if (unit->getFaction() == FACTION_PLAYER)
+			return Vocab::get(Vocab::FRIENDLY);
 		std::vector<BattleUnit *> *seen = action->actor->getVisibleUnits();
 		bool inView = std::find(seen->begin(), seen->end(), unit) != seen->end();
 		return Vocab::get(inView ? Vocab::IN_VIEW : Vocab::OUT_OF_VIEW);

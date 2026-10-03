@@ -60,6 +60,8 @@ public:
 	void init();
 	/// Updates the soldier info (Weight, TU).
 	void updateStats();
+	/// Gets the inventory widget (for the accessibility layer).
+	Inventory *getInventory() const { return _inv; }
 	/// Saves the soldiers' equipment-layout.
 	void saveEquipmentLayout();
 	/// Handler for clicking the OK button.
