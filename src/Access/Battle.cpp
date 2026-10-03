@@ -17,6 +17,7 @@
  * along with OpenXcom.  If not, see <http://www.gnu.org/licenses/>.
  */
 #include "Battle.h"
+#include <algorithm>
 #include <cstdlib>
 #include <map>
 #include <set>
@@ -493,12 +494,176 @@ namespace
 			say(unitSummary(state, after), true);
 	}
 
+	// The scanner: points of interest bucketed by category, rebuilt from live state on each key.
+
+	enum ScanCategory { SCAN_SOLDIERS, SCAN_ENEMIES, SCAN_CIVILIANS, SCAN_ITEMS, SCAN_DOORS, SCAN_EXITS, SCAN_COUNT };
+
+	/// One scanner entry. Units are identified by pointer since they move; everything else by tile and tag.
+	struct ScanEntry
+	{
+		std::string name;
+		Position pos;
+		BattleUnit *unit;
+		int tag;
+		bool same(const ScanEntry &o) const { return unit ? unit == o.unit : (!o.unit && pos == o.pos && tag == o.tag); }
+	};
+
+	int _scanCategory = SCAN_SOLDIERS;
+	ScanEntry _scanCurrent = { std::string(), Position(), 0, -1 };
+
+	Vocab::Id categoryName(int category)
+	{
+		static const Vocab::Id names[SCAN_COUNT] = { Vocab::SCAN_SOLDIERS, Vocab::SCAN_ENEMIES, Vocab::SCAN_CIVILIANS, Vocab::SCAN_ITEMS, Vocab::SCAN_DOORS, Vocab::SCAN_EXITS };
+		return names[category];
+	}
+
+	/// Doors on a tile's own west and north edges, with the same discovery rules as the tile description.
+	void addDoors(std::vector<ScanEntry> &out, Tile *tile)
+	{
+		static const TilePart parts[2] = { O_WESTWALL, O_NORTHWALL };
+		for (int i = 0; i < 2; ++i)
+		{
+			if (!tile->isDiscovered(2) && !tile->isDiscovered(i))
+				continue;
+			EdgeKind kind = wallKind(tile, parts[i]);
+			Vocab::Id id;
+			switch (kind)
+			{
+			case EDGE_DOOR: id = Vocab::DOOR; break;
+			case EDGE_UFO_DOOR: id = Vocab::UFO_DOOR; break;
+			case EDGE_UFO_DOOR_OPEN: id = Vocab::UFO_DOOR_OPEN; break;
+			default: continue;
+			}
+			out.push_back({ Vocab::format(id, { dirName(i == 0 ? 6 : 0) }), tile->getPosition(), 0, i });
+		}
+	}
+
+	std::vector<ScanEntry> scan(BattlescapeState *state, int category)
+	{
+		SavedBattleGame *save = saveOf(state);
+		Language *lang = state->getGame()->getLanguage();
+		std::vector<ScanEntry> out;
+		if (category <= SCAN_CIVILIANS)
+		{
+			static const UnitFaction factions[3] = { FACTION_PLAYER, FACTION_HOSTILE, FACTION_NEUTRAL };
+			for (BattleUnit *unit : *save->getUnits())
+			{
+				if (unit->getFaction() == factions[category] && unitShown(unit))
+					out.push_back({ unit->getName(lang), unit->getPosition(), unit, 0 });
+			}
+		}
+		else
+		{
+			for (int i = 0; i < save->getMapSizeXYZ(); ++i)
+			{
+				Tile *tile = save->getTiles()[i];
+				if (category == SCAN_DOORS)
+				{
+					addDoors(out, tile);
+					continue;
+				}
+				if (!tile->isDiscovered(2))
+					continue;
+				if (category == SCAN_ITEMS && !tile->getInventory()->empty())
+				{
+					std::vector<BattleItem *> *items = tile->getInventory();
+					std::string name = state->tr(items->front()->getRules()->getName());
+					if (items->size() > 1)
+						name = Vocab::format(Vocab::AND_LIST, { name, Vocab::format(Vocab::MORE_ITEMS, { num((int)items->size() - 1) }) });
+					out.push_back({ name, tile->getPosition(), 0, 0 });
+				}
+				else if (category == SCAN_EXITS)
+				{
+					MapData *floor = tile->getMapData(O_FLOOR);
+					if (floor && floor->getSpecialType() == END_POINT)
+						out.push_back({ Vocab::get(Vocab::EXIT_AREA), tile->getPosition(), 0, 0 });
+				}
+			}
+		}
+		// Nearest first; a level counts as a few tiles, since climbing costs more than walking.
+		Position from = anchor();
+		std::stable_sort(out.begin(), out.end(), [&](const ScanEntry &a, const ScanEntry &b)
+		{
+			Position da = a.pos - from, db = b.pos - from;
+			return da.x * da.x + da.y * da.y + 9 * da.z * da.z < db.x * db.x + db.y * db.y + 9 * db.z * db.z;
+		});
+		return out;
+	}
+
+	void sayEntry(const std::vector<ScanEntry> &list, size_t index)
+	{
+		const ScanEntry &e = list[index];
+		say(joinComma({ e.name, offsetText(anchor(), e.pos), Vocab::format(Vocab::POSITION, { num((int)index + 1), num((int)list.size()) }) }), true);
+	}
+
+	/// Next or previous entry in the current category, keeping your place by identity as distances change.
+	void scanStep(BattlescapeState *state, int step)
+	{
+		std::vector<ScanEntry> list = scan(state, _scanCategory);
+		if (list.empty())
+		{
+			_scanCurrent.tag = -1;
+			_scanCurrent.unit = 0;
+			say(Vocab::format(Vocab::SCAN_NONE, { Vocab::get(categoryName(_scanCategory)) }), true);
+			return;
+		}
+		int index = -1;
+		for (size_t i = 0; i < list.size(); ++i)
+		{
+			if (list[i].same(_scanCurrent))
+			{
+				index = (int)i;
+				break;
+			}
+		}
+		int count = (int)list.size();
+		index = index < 0 ? (step > 0 ? 0 : count - 1) : ((index + step) % count + count) % count;
+		_scanCurrent = list[index];
+		sayEntry(list, index);
+	}
+
+	/// Next or previous category; says its name and count, then its nearest entry.
+	void scanCategory(BattlescapeState *state, int step)
+	{
+		_scanCategory = ((_scanCategory + step) % SCAN_COUNT + SCAN_COUNT) % SCAN_COUNT;
+		std::vector<ScanEntry> list = scan(state, _scanCategory);
+		const std::string &name = Vocab::get(categoryName(_scanCategory));
+		if (list.empty())
+		{
+			_scanCurrent.tag = -1;
+			_scanCurrent.unit = 0;
+			say(Vocab::format(Vocab::SCAN_NONE, { name }), true);
+			return;
+		}
+		_scanCurrent = list[0];
+		say(Vocab::format(Vocab::SCAN_CATEGORY, { name, num((int)list.size()) }), true);
+		const ScanEntry &e = list[0];
+		say(joinComma({ e.name, offsetText(anchor(), e.pos) }), false);
+	}
+
+	/// Moves the cursor onto the current entry, if it's still there.
+	void scanJump(BattlescapeState *state)
+	{
+		for (const ScanEntry &e : scan(state, _scanCategory))
+		{
+			if (e.same(_scanCurrent))
+			{
+				moveCursor(state, e.pos, e.pos.z != _cursor.z);
+				return;
+			}
+		}
+		say(Vocab::get(Vocab::SCAN_GONE), true);
+	}
+
 	void reset(SavedBattleGame *save)
 	{
 		_battle = save;
 		_selected = 0;
 		_soldier = 0;
 		_spotted.clear();
+		_scanCategory = SCAN_SOLDIERS;
+		_scanCurrent.unit = 0;
+		_scanCurrent.tag = -1;
 		_awaiting = false;
 		_endTurnArmed = 0;
 		_cursor = Position(save->getMapSizeX() / 2, save->getMapSizeY() / 2, 0);
@@ -583,6 +748,19 @@ bool handleKey(BattlescapeState *state, SDLKey key, bool shift, bool ctrl)
 		return false;
 	case SDLK_TAB:
 		cycleSoldier(state, shift);
+		return true;
+	case SDLK_PERIOD:
+	case SDLK_COMMA:
+	{
+		int step = key == SDLK_PERIOD ? 1 : -1;
+		if (shift)
+			scanCategory(state, step);
+		else
+			scanStep(state, step);
+		return true;
+	}
+	case SDLK_SLASH:
+		scanJump(state);
 		return true;
 	case SDLK_LSHIFT:
 		// The game binds Left Shift alone to previous soldier, which fires on every Shift+key.

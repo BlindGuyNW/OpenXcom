@@ -37,6 +37,10 @@ class BattlescapeState;
  * opens a door like a right click, Escape cancels targeting,
  * Tab/Shift+Tab cycle soldiers, Space reads the soldier's status,
  * Ctrl+L reads the cursor tile in full, Ctrl+E twice ends the turn.
+ *
+ * The scanner: Period/Comma step through the current category nearest first,
+ * Shift+Period/Comma change category (soldiers, enemies, civilians, items,
+ * doors, exit area), Slash jumps the cursor to the current entry.
  */
 namespace Battle
 {

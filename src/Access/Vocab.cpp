@@ -93,6 +93,15 @@ namespace
 		"{0} spotted, {1}",
 		"No soldier selected",
 		"no floor, {0} below: {1}",
+		"Soldiers",
+		"Enemies",
+		"Civilians",
+		"Items",
+		"Doors",
+		"Exit area",
+		"{0}, {1}",
+		"{0}, none",
+		"That's gone",
 	};
 }
 
