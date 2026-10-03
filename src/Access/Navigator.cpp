@@ -328,6 +328,10 @@ bool handleEvent(Game *game, const SDL_Event &ev)
 void update(Game *game)
 {
 	_game = game;
+	// A just-pushed state hasn't run init() yet, and many set up their widgets there.
+	// Reading it now would announce half-built screens.
+	if (!game->isStateInitialized())
+		return;
 	sync();
 	if (!_graph || !_graph->Rerender())
 		return;

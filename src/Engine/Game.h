@@ -96,6 +96,8 @@ public:
 	bool isState(State *state) const;
 	/// Gets the state stack, bottom first.
 	const std::list<State*> &getStates() const { return _states; }
+	/// Has the top state run init() since the stack last changed?
+	bool isStateInitialized() const { return _init; }
 	/// Returns whether the game is shutting down.
 	bool isQuitting() const;
 	/// Loads the default and current language.
