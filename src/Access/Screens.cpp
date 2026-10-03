@@ -28,6 +28,12 @@
 #include "../Interface/TextButton.h"
 #include "../Menu/MainMenuState.h"
 #include "../Menu/NewBattleState.h"
+#include "../Battlescape/BriefingState.h"
+#include "../Battlescape/InventoryState.h"
+#include "../Battlescape/NextTurnState.h"
+#include "../Engine/InteractiveSurface.h"
+#include "../Engine/LocalizedText.h"
+#include "Vocab.h"
 
 namespace OpenXcom
 {
@@ -50,6 +56,35 @@ std::string firstText(State *state)
 			return text->getText();
 	}
 	return "";
+}
+
+/// Every visible text of a state in reading order, top to bottom then left to right, as sentences.
+/// For screens that are just something to read.
+std::string allText(State *state)
+{
+	std::vector<Text *> texts;
+	for (Surface *s : state->getSurfaces())
+	{
+		Text *text = dynamic_cast<Text *>(s);
+		if (text && text->getVisible() && !text->getText().empty())
+			texts.push_back(text);
+	}
+	std::stable_sort(texts.begin(), texts.end(), [](Text *a, Text *b)
+	{
+		return std::make_pair(a->getY(), a->getX()) < std::make_pair(b->getY(), b->getX());
+	});
+	std::string result;
+	for (Text *text : texts)
+	{
+		std::string line = text->getText();
+		if (!result.empty())
+			result += " ";
+		result += line;
+		char last = line[line.size() - 1];
+		if (last != '.' && last != '!' && last != '?' && last != ':')
+			result += ".";
+	}
+	return result;
 }
 
 bool overlaps(int a, int aLen, int b, int bLen)
@@ -171,11 +206,68 @@ AccessScreen newBattle()
 	return s;
 }
 
+AccessScreen briefing()
+{
+	AccessScreen s;
+	s.key = "briefing";
+	s.isActive = [](State *state) { return dynamic_cast<BriefingState *>(state) != nullptr; };
+	s.name = allText;
+	s.build = addWidgets;
+	return s;
+}
+
+/// The equip screen. Only its navigation buttons for now; the items themselves come later.
+AccessScreen inventory()
+{
+	AccessScreen s;
+	s.key = "inventory";
+	s.isActive = [](State *state) { return dynamic_cast<InventoryState *>(state) != nullptr; };
+	// The unit's name is the state's first text.
+	s.name = [](State *state) { return Vocab::format(Vocab::INVENTORY, { firstText(state) }); };
+	s.build = [](GraphBuilder &b, State *state)
+	{
+		// The image buttons are told apart by their tooltips, which name them for the mouse too.
+		const char *wanted[] = { "STR_OK", "STR_PREVIOUS_UNIT", "STR_NEXT_UNIT" };
+		for (const char *tooltip : wanted)
+		{
+			for (Surface *surface : state->getSurfaces())
+			{
+				InteractiveSurface *btn = dynamic_cast<InteractiveSurface *>(surface);
+				if (!btn || !btn->getVisible() || btn->getTooltip() != tooltip)
+					continue;
+				NodeVtable v = Controls::labelledButton(state, btn, state->tr(tooltip));
+				if (btn->getTooltip() != "STR_OK")
+					v.StateText = [state] { return firstText(state); };
+				b.AddItem(ControlId::Referenced(btn, tooltip), v);
+			}
+		}
+	};
+	return s;
+}
+
+/// "Turn 1, side: X-Com". Any key continues in the game; here Enter on the one item does.
+AccessScreen nextTurn()
+{
+	AccessScreen s;
+	s.key = "nextTurn";
+	s.isActive = [](State *state) { return dynamic_cast<NextTurnState *>(state) != nullptr; };
+	s.name = allText;
+	s.build = [](GraphBuilder &b, State *state)
+	{
+		NodeVtable v;
+		v.Type = &Controls::button();
+		v.Announcements.push_back(NodeAnnouncement([] { return Vocab::get(Vocab::CONTINUE); }, false, AnnouncementKinds::Label));
+		v.OnActivate = [state] { static_cast<NextTurnState *>(state)->close(); };
+		b.AddItem(ControlId::Referenced(state, "continue"), v);
+	};
+	return s;
+}
+
 }
 
 const std::vector<AccessScreen> &all()
 {
-	static const std::vector<AccessScreen> screens = { mainMenu(), newBattle() };
+	static const std::vector<AccessScreen> screens = { mainMenu(), newBattle(), briefing(), inventory(), nextTurn() };
 	return screens;
 }
 

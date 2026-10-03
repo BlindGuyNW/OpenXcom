@@ -36,6 +36,8 @@ namespace
 		"slider",
 		"{0} of {1}",
 		"No tooltip",
+		"Inventory, {0}",
+		"Continue",
 	};
 }
 

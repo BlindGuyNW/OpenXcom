@@ -98,6 +98,15 @@ NodeVtable textButton(State *state, TextButton *btn)
 	return v;
 }
 
+NodeVtable labelledButton(State *state, InteractiveSurface *btn, const std::string &label)
+{
+	NodeVtable v;
+	v.Type = &button();
+	v.Announcements.push_back(NodeAnnouncement([label] { return label; }, false, AnnouncementKinds::Label));
+	v.OnActivate = [state, btn] { click(state, btn); };
+	return v;
+}
+
 NodeVtable comboBox(State *state, ComboBox *box, const std::string &label)
 {
 	NodeVtable v;

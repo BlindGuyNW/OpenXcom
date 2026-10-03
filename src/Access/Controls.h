@@ -47,6 +47,8 @@ namespace Controls
 	void click(State *state, InteractiveSurface *surface, Uint8 mouseButton = SDL_BUTTON_LEFT);
 	/// A node for a text button: its visible text as the label, Enter clicks it.
 	Graph::NodeVtable textButton(State *state, TextButton *button);
+	/// A node for a button without text of its own (an image button): the given label, Enter clicks it.
+	Graph::NodeVtable labelledButton(State *state, InteractiveSurface *button, const std::string &label);
 	/// A node for a combo box: Left/Right step through the options (Shift for bigger steps)
 	/// and run the box's change handler, as picking from the drop-down would.
 	Graph::NodeVtable comboBox(State *state, ComboBox *box, const std::string &label);

@@ -39,6 +39,8 @@ namespace Vocab
 		ROLE_SLIDER,
 		POSITION,
 		NO_TOOLTIP,
+		INVENTORY,
+		CONTINUE,
 		COUNT
 	};
 
