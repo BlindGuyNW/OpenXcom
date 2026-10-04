@@ -154,6 +154,7 @@ namespace Vocab
 		PART_SELECTED,
 		ITEMS_LEFT,
 		CLOSE,
+		EQUIP_HINT,
 		COUNT
 	};
 

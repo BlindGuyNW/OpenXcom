@@ -23,6 +23,7 @@
 #include <memory>
 #include <set>
 #include "Battle.h"
+#include "Controls.h"
 #include "Screens.h"
 #include "Speech.h"
 #include "Vocab.h"
@@ -230,6 +231,14 @@ namespace
 			{
 				whereAmI();
 				return true;
+			}
+			if (key == SDLK_LEFT || key == SDLK_RIGHT)
+			{
+				bool adjusted = false;
+				guarded("adjust", [&] { adjusted = _graph->TryAdjust((key == SDLK_LEFT ? -1 : 1) * Controls::ADJUST_LIMIT, false); });
+				if (adjusted)
+					stateFeedback();
+				return adjusted;
 			}
 			return false;
 		}

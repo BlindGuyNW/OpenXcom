@@ -19,6 +19,8 @@
 #include "Screens.h"
 #include "Controls.h"
 #include <algorithm>
+#include <climits>
+#include <cstdlib>
 #include <map>
 #include <tuple>
 #include "../Engine/State.h"
@@ -785,13 +787,24 @@ AccessScreen craftEquipment()
 				// A left press on the row is how the screen learns which item the arrows act on.
 				Controls::clickRow(state, list, row);
 				CraftEquipmentState *equip = static_cast<CraftEquipmentState *>(state);
-				int count = large ? 5 : 1;
+				// Ctrl is the arrows' right click: as many as fit, or all back to the stores.
+				int count = std::abs(sign) >= Controls::ADJUST_LIMIT ? INT_MAX : (large ? 5 : 1);
 				if (sign < 0)
 					equip->moveLeftByValue(count);
 				else
 					equip->moveRightByValue(count);
 			};
-			v.StateText = [list, row] { return Controls::rowText(list, row); };
+			// The game ignores clicks on the row itself, so Enter re-reads it with how to move items.
+			static bool hint = false;
+			v.OnActivate = [] { hint = true; };
+			v.StateText = [list, row]
+			{
+				std::string text = Controls::rowText(list, row);
+				if (hint)
+					text += ". " + Vocab::get(Vocab::EQUIP_HINT);
+				hint = false;
+				return text;
+			};
 		});
 	};
 	return s;

@@ -151,6 +151,7 @@ namespace
 		"{0} selected",
 		"{0} left",
 		"close",
+		"Right moves one to the craft, Left one back to the stores. Shift for five, Ctrl for all",
 	};
 }
 

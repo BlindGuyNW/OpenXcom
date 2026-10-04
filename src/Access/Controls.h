@@ -37,6 +37,9 @@ class TextList;
  */
 namespace Controls
 {
+	/// An OnAdjust sign this large (times -1 or 1) means as far as it goes: Ctrl+Left/Right.
+	/// Controls that clamp (combo boxes, sliders) just land on their ends.
+	const int ADJUST_LIMIT = 1000000;
 	/// The "button" control type.
 	const Graph::ControlType &button();
 	/// The "combo box" control type.
