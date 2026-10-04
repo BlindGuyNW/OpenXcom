@@ -10,6 +10,7 @@ set ( access_src
   Access/Navigator.cpp
   Access/Screens.cpp
   Access/Battle.cpp
+  Access/Dogfight.cpp
   Access/Geo.cpp
   Access/TerrainNames.cpp
   Access/Graph/GraphAnnouncer.cpp

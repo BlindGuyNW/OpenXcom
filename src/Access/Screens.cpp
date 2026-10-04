@@ -72,6 +72,18 @@
 #include "../Engine/Unicode.h"
 #include "../fmath.h"
 #include "Geo.h"
+#include "Dogfight.h"
+#include "../Battlescape/AliensCrashState.h"
+#include "../Geoscape/BaseDestroyedState.h"
+#include "../Geoscape/ConfirmCydoniaState.h"
+#include "../Geoscape/ConfirmLandingState.h"
+#include "../Geoscape/DogfightErrorState.h"
+#include "../Geoscape/InterceptState.h"
+#include "../Geoscape/SelectDestinationState.h"
+#include "../Savegame/Base.h"
+#include "../Savegame/Craft.h"
+#include "../Savegame/Waypoint.h"
+#include "../Engine/Options.h"
 #include "../Battlescape/AbortMissionState.h"
 #include "../Basescape/CraftArmorState.h"
 #include "../Basescape/CraftEquipmentState.h"
@@ -1070,7 +1082,8 @@ AccessScreen buildNewBase()
 				City *city = rules->getCities()->at(i);
 				NodeVtable v;
 				std::string label = city->getName(game->getLanguage());
-				std::string country = Geo::placeName(city->getLongitude(), city->getLatitude());
+				// Country only: the region is already the heading.
+				std::string country = Geo::countryName(city->getLongitude(), city->getLatitude());
 				if (!country.empty() && country != label)
 					label += ", " + country;
 				v.Announcements.push_back(NodeAnnouncement([label] { return label; }, false, AnnouncementKinds::Label));
@@ -1087,6 +1100,128 @@ AccessScreen buildNewBase()
 			b.PopContext();
 		}
 		// Cancel, when it's there (not for the first base).
+		addWidgets(b, state);
+	};
+	return s;
+}
+
+/// An Intercept row: "Interceptor-1, READY, Base 1, 2 weapons, 0 soldiers, 0 tanks".
+std::string interceptRow(State *state, Craft *c)
+{
+	return Vocab::format(Vocab::INTERCEPT_ROW, { c->getName(State::getGamePtr()->getLanguage()), state->tr(c->getStatus()), c->getBase()->getName(),
+		std::to_string(c->getNumWeapons()), std::to_string(c->getNumSoldiers()), std::to_string(c->getNumVehicles()) });
+}
+
+/// Why InterceptState::lstCraftsLeftClick won't launch a craft (same test), or empty if it will.
+std::string launchRefusal(State *state, Craft *c)
+{
+	if (c->getStatus() == "STR_READY" || ((c->getStatus() == "STR_OUT" || Options::craftLaunchAlways) && !c->getLowFuel() && !c->getMissionComplete()))
+		return "";
+	std::string reason;
+	if (c->getLowFuel())
+		reason = Vocab::get(Vocab::LOW_FUEL);
+	else if (c->getMissionComplete())
+		reason = Vocab::get(Vocab::RETURNING);
+	else
+		reason = state->tr(c->getStatus());
+	return Vocab::format(Vocab::CANT_LAUNCH, { reason });
+}
+
+/// Launch interception: one row per craft from the state's own craft list; Enter launches,
+/// or says why not. Backspace (right click) centres the globe on a craft in flight, as the game does.
+AccessScreen intercept()
+{
+	AccessScreen s = simpleScreen("intercept", is<InterceptState>);
+	s.name = firstText;
+	s.build = [](GraphBuilder &b, State *state)
+	{
+		InterceptState *ic = static_cast<InterceptState *>(state);
+		addWidgets(b, state, [state, ic](Surface *, size_t row, NodeVtable &v)
+		{
+			if (row == NO_ROW || row >= ic->getCrafts().size())
+				return;
+			Craft *c = ic->getCrafts()[row];
+			v.Announcements.clear();
+			v.Announcements.push_back(NodeAnnouncement([state, c] { return interceptRow(state, c); }, false, AnnouncementKinds::Label));
+			// Only heard if the screen is still up after Enter, which is exactly a refusal.
+			v.StateText = [state, c] { return launchRefusal(state, c); };
+		});
+	};
+	return s;
+}
+
+/// A destination as the picker reads it: where it is, how far from the craft, and whether it's
+/// inside the range circle the globe draws (half the craft's fuel, so it can get home).
+std::string destinationText(Craft *craft, const std::string &name, double lon, double lat)
+{
+	std::vector<std::string> parts = { name, Geo::placeName(lon, lat), Geo::offsetText(craft, lon, lat),
+		Vocab::get(craft->getDistance(lon, lat) <= craft->getBaseRange() ? Vocab::DF_IN_RANGE : Vocab::DF_OUT_OF_RANGE) };
+	std::string s;
+	for (const std::string &p : parts)
+	{
+		if (!p.empty())
+			s += (s.empty() ? "" : ", ") + p;
+	}
+	return s;
+}
+
+/// Select destination: what's on the globe a craft can go to, nearest first, then the cities
+/// by region for flying to a point. Enter goes through MultipleTargetsState as a globe click does,
+/// so the game's own confirmation (and waypoint bookkeeping) follows.
+AccessScreen selectDestination()
+{
+	AccessScreen s;
+	s.key = "selectDestination";
+	s.isActive = is<SelectDestinationState>;
+	s.name = allText;
+	s.build = [](GraphBuilder &b, State *state)
+	{
+		Craft *craft = static_cast<SelectDestinationState *>(state)->getCraft();
+		Game *game = State::getGamePtr();
+		std::vector<Target *> targets = Geo::destinations();
+		std::stable_sort(targets.begin(), targets.end(), [craft](Target *a, Target *b) { return craft->getDistance(a) < craft->getDistance(b); });
+		if (!targets.empty())
+		{
+			b.PushContext(Vocab::get(Vocab::DEST_TARGETS));
+			for (Target *t : targets)
+			{
+				NodeVtable v;
+				v.Announcements.push_back(NodeAnnouncement([craft, t, game]
+				{
+					return destinationText(craft, t->getName(game->getLanguage()), t->getLongitude(), t->getLatitude());
+				}, false, AnnouncementKinds::Label));
+				v.OnActivate = [craft, t, game] { game->pushState(new MultipleTargetsState(std::vector<Target *>(1, t), craft, 0)); };
+				b.AddItem(ControlId::Referenced(t, "target:" + t->getType() + ":" + std::to_string(t->getId())), v);
+			}
+			b.PopContext();
+		}
+		for (Region *region : *game->getSavedGame()->getRegions())
+		{
+			RuleRegion *rules = region->getRules();
+			if (rules->getCities()->empty())
+				continue;
+			b.PushContext(state->tr(rules->getType()));
+			for (size_t i = 0; i < rules->getCities()->size(); ++i)
+			{
+				City *city = rules->getCities()->at(i);
+				NodeVtable v;
+				v.Announcements.push_back(NodeAnnouncement([craft, city, game]
+				{
+					return destinationText(craft, city->getName(game->getLanguage()), city->getLongitude(), city->getLatitude());
+				}, false, AnnouncementKinds::Label));
+				v.OnActivate = [craft, city, game]
+				{
+					// What clicking an empty spot on the globe does: a fresh waypoint, registered only if confirmed.
+					Waypoint *w = new Waypoint();
+					w->setLongitude(city->getLongitude());
+					w->setLatitude(city->getLatitude());
+					game->pushState(new MultipleTargetsState(std::vector<Target *>(1, w), craft, 0));
+				};
+				b.AddItem(ControlId::Referenced(city, "city:" + rules->getType() + ":" + std::to_string(i)), v);
+			}
+			b.PopContext();
+		}
+		// Cancel, and Cydonia when it's offered.
 		addWidgets(b, state);
 	};
 	return s;
@@ -1145,6 +1280,14 @@ const std::vector<AccessScreen> &all()
 		popupScreen("geoscapeCraft", is<GeoscapeCraftState>),
 		popupScreen("confirmDestination", is<ConfirmDestinationState>),
 		simpleScreen("ufopaediaStart", is<UfopaediaStartState>),
+		intercept(),
+		selectDestination(),
+		Dogfight::screen(),
+		popupScreen("confirmLanding", is<ConfirmLandingState>),
+		popupScreen("aliensCrash", is<AliensCrashState>),
+		popupScreen("baseDestroyed", is<BaseDestroyedState>),
+		popupScreen("confirmCydonia", is<ConfirmCydoniaState>),
+		popupScreen("dogfightError", is<DogfightErrorState>),
 		simpleScreen("ufopaediaSelect", is<UfopaediaSelectState>),
 	};
 	return screens;

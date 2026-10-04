@@ -20,6 +20,7 @@
 #include <algorithm>
 #include <vector>
 #include "../fmath.h"
+#include "Dogfight.h"
 #include "Speech.h"
 #include "Vocab.h"
 #include "../Engine/Game.h"
@@ -242,13 +243,32 @@ namespace
 	}
 }
 
-std::string placeName(double lon, double lat)
+std::vector<Target *> destinations()
+{
+	std::vector<Target *> out;
+	for (int category : { SCAN_UFOS, SCAN_SITES, SCAN_ALIEN_BASES, SCAN_WAYPOINTS })
+	{
+		std::vector<Target *> part = scan(category);
+		out.insert(out.end(), part.begin(), part.end());
+	}
+	return out;
+}
+
+std::string countryName(double lon, double lat)
 {
 	for (Country *c : *save()->getCountries())
 	{
 		if (c->getRules()->insideCountry(lon, lat))
 			return tr(c->getRules()->getType());
 	}
+	return "";
+}
+
+std::string placeName(double lon, double lat)
+{
+	std::string country = countryName(lon, lat);
+	if (!country.empty())
+		return country;
 	for (Region *r : *save()->getRegions())
 	{
 		if (r->getRules()->insideRegion(lon, lat))
@@ -299,6 +319,10 @@ bool handleKey(GeoscapeState *state, SDLKey key, bool shift, bool ctrl)
 	case SDLK_RETURN:
 	case SDLK_KP_ENTER:
 		openCurrent(state);
+		return true;
+	case SDLK_d:
+		if (!Dogfight::restoreMinimized(state))
+			say(Vocab::get(Vocab::GEO_NO_MINIMIZED), true);
 		return true;
 	default:
 		return false;

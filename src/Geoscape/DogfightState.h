@@ -150,6 +150,20 @@ public:
 	void setWaitForAltitude(bool wait);
 	/// Waits until the UFO reaches the right altitude.
 	bool getWaitForAltitude() const;
+	/// Gets the attack mode buttons: standoff, cautious, standard, aggressive, disengage.
+	std::vector<ImageButton*> getModeButtons() const { return { _btnStandoff, _btnCautious, _btnStandard, _btnAggressive, _btnDisengage }; }
+	/// Gets the pressed attack mode button.
+	ImageButton *getMode() const { return _mode; }
+	/// Gets the button that toggles a weapon (0 or 1).
+	InteractiveSurface *getWeaponButton(int i) const { return i == 0 ? _weapon1 : _weapon2; }
+	/// Is a weapon (0 or 1) switched on?
+	bool isWeaponEnabled(int i) const { return i == 0 ? _weapon1Enabled : _weapon2Enabled; }
+	/// Gets the distance to the UFO, as the window shows it.
+	int getCurrentDistance() const { return _currentDist; }
+	/// Gets the minimize button.
+	InteractiveSurface *getMinimizeButton() const { return _btnMinimize; }
+	/// Gets the icon that restores a minimized interception.
+	InteractiveSurface *getMinimizedIcon() const { return _btnMinimizedIcon; }
 };
 
 }

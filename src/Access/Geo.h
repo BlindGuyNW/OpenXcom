@@ -18,6 +18,7 @@
  * along with OpenXcom.  If not, see <http://www.gnu.org/licenses/>.
  */
 #include <string>
+#include <vector>
 #include <SDL.h>
 
 namespace OpenXcom
@@ -38,6 +39,7 @@ class Target;
  * current category nearest the first base first, Shift+Period/Comma change
  * category (UFOs, alien sites, alien bases, craft in flight, bases, waypoints),
  * Enter opens the current entry as clicking it would, Ctrl+L reads it again.
+ * D restores a minimized interception window.
  * Speed changes are spoken, queued.
  */
 namespace Geo
@@ -46,6 +48,10 @@ namespace Geo
 	bool handleKey(GeoscapeState *state, SDLKey key, bool shift, bool ctrl);
 	/// Per-frame tick: the speed differ.
 	void update(GeoscapeState *state);
+	/// What a craft can be sent to, as the globe shows it: UFOs, alien sites, alien bases, waypoints.
+	std::vector<Target *> destinations();
+	/// The country a point is in, or empty.
+	std::string countryName(double lon, double lat);
 	/// Where a point is, for speech: its country, else its region. Empty over open sea outside every region.
 	std::string placeName(double lon, double lat);
 	/// Distance and compass bearing from one target to a point: "1,230 nautical miles northeast".

@@ -460,6 +460,7 @@
     <ClCompile Include="Access\Navigator.cpp" />
     <ClCompile Include="Access\Screens.cpp" />
     <ClCompile Include="Access\Battle.cpp" />
+    <ClCompile Include="Access\Dogfight.cpp" />
     <ClCompile Include="Access\Geo.cpp" />
     <ClCompile Include="Access\TerrainNames.cpp" />
     <ClCompile Include="Access\Graph\GraphAnnouncer.cpp" />
@@ -798,6 +799,7 @@
     <ClInclude Include="Access\Navigator.h" />
     <ClInclude Include="Access\Screens.h" />
     <ClInclude Include="Access\Battle.h" />
+    <ClInclude Include="Access\Dogfight.h" />
     <ClInclude Include="Access\Geo.h" />
     <ClInclude Include="Access\TerrainNames.h" />
     <ClInclude Include="Access\Graph\ControlId.hpp" />

@@ -122,6 +122,7 @@ Not done yet: narrating the silent events (decision 2's queued narration: craft 
 - The Ufopaedia start and select lists come free as `simpleScreen`; articles wait for M4.
 
 ### M2: intercept, fight, land, come home
+First half in (2026-10-04, untested): Intercept, SelectDestination, the dogfight module and recipe, ConfirmLanding, AliensCrash, BaseDestroyed, ConfirmCydonia, DogfightError. Still to do: CraftInfo, CraftWeapons, CraftSoldiers refusals, debriefing follow-ups, BaseDefense.
 - `InterceptState`: rows as "name, status, base, N weapons, N soldiers, N HWPs" (accessor for its craft list or parse), refusal feedback when a craft can't go.
 - `SelectDestinationState` recipe (targets + cities, range).
 - Dogfight module and recipe.

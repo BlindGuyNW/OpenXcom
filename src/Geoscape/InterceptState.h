@@ -48,6 +48,8 @@ private:
 	Target *_target;
 	std::vector<Craft*> _crafts;
 public:
+	/// Gets the crafts in list order.
+	const std::vector<Craft*> &getCrafts() const { return _crafts; }
 	/// Creates the Intercept state.
 	InterceptState(Globe *globe, Base *base = 0, Target *target = 0);
 	/// Cleans up the Intercept state.

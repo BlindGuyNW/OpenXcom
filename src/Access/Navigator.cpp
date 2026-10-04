@@ -24,6 +24,7 @@
 #include <set>
 #include "Battle.h"
 #include "Controls.h"
+#include "Dogfight.h"
 #include "Geo.h"
 #include "Screens.h"
 #include "Speech.h"
@@ -461,6 +462,9 @@ void update(Game *game)
 	if (!game->isStateInitialized())
 		return;
 	sync();
+	// Interceptions are narrated whether their windows' recipe is attached or not.
+	if (GeoscapeState *geo = dynamic_cast<GeoscapeState *>(topState()))
+		guarded("dogfight update", [&] { Dogfight::update(geo); });
 	// After sync, so a screen that opens with its field focused says its name first.
 	guarded("edit echo", [] { watchEdit(); });
 	if (!_screen)

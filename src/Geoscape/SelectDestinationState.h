@@ -44,6 +44,8 @@ private:
 	Text *_txtTitle;
 	TextButton *_btnCancel, *_btnCydonia;
 public:
+	/// Gets the craft being sent.
+	Craft *getCraft() const { return _craft; }
 	/// Creates the Select Destination state.
 	SelectDestinationState(Craft *craft, Globe *globe);
 	/// Cleans up the Select Destination state.
