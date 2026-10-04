@@ -204,6 +204,13 @@ namespace
 		"low on fuel",
 		"returning to base",
 		"targets",
+		"weapon {0}, {1}, ammo {2} of {3}",
+		"weapon {0}, none",
+		"{0}, {1} soldiers, {2} spaces free",
+		"{0}, {1} tanks, {2} items",
+		"{0}, {1}, {2} of {3} weapons, {4} soldiers, {5} tanks",
+		"Can't open: {0} is out",
+		"bases",
 	};
 }
 

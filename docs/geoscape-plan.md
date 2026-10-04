@@ -122,7 +122,7 @@ Not done yet: narrating the silent events (decision 2's queued narration: craft 
 - The Ufopaedia start and select lists come free as `simpleScreen`; articles wait for M4.
 
 ### M2: intercept, fight, land, come home
-First half in (2026-10-04, played and working 2026-10-04; AliensCrash, BaseDestroyed, ConfirmCydonia and DogfightError not yet seen in play): Intercept, SelectDestination, the dogfight module and recipe, ConfirmLanding, AliensCrash, BaseDestroyed, ConfirmCydonia, DogfightError. Still to do: CraftInfo, CraftWeapons, CraftSoldiers refusals, debriefing follow-ups, BaseDefense. Also agreed: a new interception should start focus at the top of its window (today the Geoscape's saved cursor puts it back where the last dogfight left off, since ids reuse the interception number).
+First half in (2026-10-04, played and working 2026-10-04; AliensCrash, BaseDestroyed, ConfirmCydonia and DogfightError not yet seen in play): Intercept, SelectDestination, the dogfight module and recipe, ConfirmLanding, AliensCrash, BaseDestroyed, ConfirmCydonia, DogfightError. Still to do: CraftInfo, CraftWeapons, CraftSoldiers refusals, debriefing follow-ups, BaseDefense. Done since: a new interception starts focus at the top of its window; the Basescape menu (buttons, base switcher; no grid), the craft list and CraftInfo (pulled forward from M3 so craft screens can be reached).
 - `InterceptState`: rows as "name, status, base, N weapons, N soldiers, N HWPs" (accessor for its craft list or parse), refusal feedback when a craft can't go.
 - `SelectDestinationState` recipe (targets + cities, range).
 - Dogfight module and recipe.

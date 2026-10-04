@@ -18,11 +18,13 @@
  * along with OpenXcom.  If not, see <http://www.gnu.org/licenses/>.
  */
 #include <SDL.h>
+#include "Graph/ControlId.hpp"
 
 namespace OpenXcom
 {
 
 class Game;
+class State;
 
 /**
  * The graph navigator and screen manager (graph a11y spec 7 and 9).
@@ -47,6 +49,9 @@ namespace Navigator
 	bool handleEvent(Game *game, const SDL_Event &ev);
 	/// Per-frame tick: attaches to the top state's screen and announces focus changes.
 	void update(Game *game);
+	/// Moves a state's cursor to a node, for when the game opens something new on the same state.
+	/// Takes effect on the next rebuild; the differ announces it.
+	void focus(State *state, const Graph::ControlId &id);
 }
 
 }

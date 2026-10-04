@@ -89,6 +89,10 @@ public:
 	void edtBaseChange(Action *action);
 	/// Handler for pressing a base selection hotkey.
 	void handleKeyPress(Action *action);
+	/// Gets the base being shown (for the accessibility layer).
+	Base *getBase() const { return _base; }
+	/// Shows another base, as its hotkey does (for the accessibility layer).
+	void selectBase(Base *base) { _base = base; init(); }
 };
 
 }

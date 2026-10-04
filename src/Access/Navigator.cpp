@@ -454,6 +454,11 @@ bool handleEvent(Game *game, const SDL_Event &ev)
 	return claimed;
 }
 
+void focus(State *state, const ControlId &id)
+{
+	_cursors[state].CurKey = id;
+}
+
 void update(Game *game)
 {
 	_game = game;

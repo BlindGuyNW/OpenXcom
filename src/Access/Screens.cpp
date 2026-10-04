@@ -87,7 +87,12 @@
 #include "../Battlescape/AbortMissionState.h"
 #include "../Basescape/CraftArmorState.h"
 #include "../Basescape/CraftEquipmentState.h"
+#include "../Basescape/BasescapeState.h"
 #include "../Basescape/CraftInfoState.h"
+#include "../Basescape/CraftsState.h"
+#include "../Mod/RuleCraft.h"
+#include "../Mod/RuleCraftWeapon.h"
+#include "../Savegame/CraftWeapon.h"
 #include "../Basescape/CraftSoldiersState.h"
 #include "../Basescape/SoldierArmorState.h"
 #include "../Basescape/SoldierInfoState.h"
@@ -1227,6 +1232,134 @@ AccessScreen selectDestination()
 	return s;
 }
 
+/// The Basescape's menu: says the base, its region and the funds on arrival, then the buttons
+/// (and the base name field), then the other bases to switch to. The facility grid isn't covered yet.
+/// The game's number keys switch bases too; either way the tick says the new base.
+AccessScreen basescape()
+{
+	static Base *shown = 0;
+	AccessScreen s;
+	s.key = "basescape";
+	s.isActive = is<BasescapeState>;
+	s.name = [](State *state)
+	{
+		shown = static_cast<BasescapeState *>(state)->getBase();
+		return allText(state);
+	};
+	s.build = [](GraphBuilder &b, State *state)
+	{
+		BasescapeState *bs = static_cast<BasescapeState *>(state);
+		addWidgets(b, state);
+		std::vector<Base *> *bases = State::getGamePtr()->getSavedGame()->getBases();
+		if (bases->size() < 2)
+			return;
+		b.PushContext(Vocab::get(Vocab::BASES));
+		for (Base *base : *bases)
+		{
+			NodeVtable v;
+			v.Type = &Controls::button();
+			v.Announcements.push_back(NodeAnnouncement([base] { return base->getName(); }, false, AnnouncementKinds::Label));
+			v.Announcements.push_back(NodeAnnouncement([bs, base] { return bs->getBase() == base ? Vocab::get(Vocab::SELECTED) : std::string(); }, false, "pressed"));
+			v.OnActivate = [bs, base] { bs->selectBase(base); };
+			b.AddItem(ControlId::Referenced(base, "base:" + base->getName()), v);
+		}
+		b.PopContext();
+	};
+	s.tick = [](State *state)
+	{
+		Base *base = static_cast<BasescapeState *>(state)->getBase();
+		if (base == shown)
+			return;
+		shown = base;
+		Speech::say(allText(state), true);
+	};
+	return s;
+}
+
+/// A craft as the base's craft list shows it, with the columns named.
+std::string craftsRow(State *state, Craft *c)
+{
+	return Vocab::format(Vocab::CRAFTS_ROW, { c->getName(State::getGamePtr()->getLanguage()), state->tr(c->getStatus()),
+		std::to_string(c->getNumWeapons()), std::to_string(c->getRules()->getWeapons()),
+		std::to_string(c->getNumSoldiers()), std::to_string(c->getNumVehicles()) });
+}
+
+/// The base's craft list. Enter opens a craft's info; the game ignores craft that are out, so that's said.
+AccessScreen crafts()
+{
+	AccessScreen s = simpleScreen("crafts", is<CraftsState>);
+	s.name = firstText;
+	s.build = [](GraphBuilder &b, State *state)
+	{
+		Base *base = static_cast<CraftsState *>(state)->getBase();
+		addWidgets(b, state, [state, base](Surface *, size_t row, NodeVtable &v)
+		{
+			if (row == NO_ROW || row >= base->getCrafts()->size())
+				return;
+			Craft *c = base->getCrafts()->at(row);
+			v.Announcements.clear();
+			v.Announcements.push_back(NodeAnnouncement([state, c] { return craftsRow(state, c); }, false, AnnouncementKinds::Label));
+			// Only heard if the screen is still up after Enter.
+			v.StateText = [c]
+			{
+				return c->getStatus() == "STR_OUT" ? Vocab::format(Vocab::CRAFT_OUT, { c->getName(State::getGamePtr()->getLanguage()) }) : std::string();
+			};
+		});
+	};
+	return s;
+}
+
+/// Craft info, wired explicitly: the weapons, crew and equipment are only pictures on screen.
+/// Arrival says the craft, its status, damage and fuel (the game's lines, with repair and refuel times).
+AccessScreen craftInfo()
+{
+	AccessScreen s;
+	s.key = "craftInfo";
+	s.isActive = is<CraftInfoState>;
+	s.name = [](State *state)
+	{
+		CraftInfoState *ci = static_cast<CraftInfoState *>(state);
+		Craft *c = ci->getCraft();
+		return c->getName(State::getGamePtr()->getLanguage()) + ". " + std::string(state->tr(c->getStatus())) + ". " +
+			ci->getDamageText()->getText() + ". " + ci->getFuelText()->getText() + ".";
+	};
+	s.build = [](GraphBuilder &b, State *state)
+	{
+		CraftInfoState *ci = static_cast<CraftInfoState *>(state);
+		Craft *c = ci->getCraft();
+		b.AddItem(ControlId::Referenced(ci->getNameEdit(), "name"), Controls::textEdit(state, ci->getNameEdit()));
+		{
+			NodeVtable v;
+			v.Announcements.push_back(NodeAnnouncement([state, ci, c]
+			{
+				return std::string(state->tr(c->getStatus())) + ", " + ci->getDamageText()->getText() + ", " + ci->getFuelText()->getText();
+			}, false, AnnouncementKinds::Label));
+			b.AddItem(ControlId::Referenced(c, "status"), v);
+		}
+		for (int i = 0; i < 2 && i < (int)c->getRules()->getWeapons(); ++i)
+		{
+			CraftWeapon *w = i < (int)c->getWeapons()->size() ? c->getWeapons()->at(i) : 0;
+			std::string n = std::to_string(i + 1);
+			std::string label = w ? Vocab::format(Vocab::CRAFT_WEAPON, { n, state->tr(w->getRules()->getType()),
+					std::to_string(w->getAmmo()), std::to_string(w->getRules()->getAmmoMax()) })
+				: Vocab::format(Vocab::CRAFT_WEAPON_NONE, { n });
+			TextButton *btn = ci->getWeaponButton(i);
+			b.AddItem(ControlId::Referenced(btn, "weapon:" + n), Controls::labelledButton(state, btn, label));
+		}
+		if (c->getRules()->getSoldiers() > 0)
+		{
+			TextButton *crew = ci->getCrewButton(), *equip = ci->getEquipButton(), *armor = ci->getArmorButton();
+			b.AddItem(ControlId::Referenced(crew, "crew"), Controls::labelledButton(state, crew, Vocab::format(Vocab::CRAFT_CREW,
+				{ crew->getText(), std::to_string(c->getNumSoldiers()), std::to_string(c->getSpaceAvailable()) })));
+			b.AddItem(ControlId::Referenced(equip, "equip"), Controls::labelledButton(state, equip, Vocab::format(Vocab::CRAFT_EQUIPMENT,
+				{ equip->getText(), std::to_string(c->getNumVehicles()), std::to_string(c->getNumEquipment()) })));
+			b.AddItem(ControlId::Referenced(armor, "armor"), Controls::textButton(state, armor));
+		}
+		b.AddItem(ControlId::Referenced(ci->getOkButton(), "ok"), Controls::textButton(state, ci->getOkButton()));
+	};
+	return s;
+}
+
 AccessScreen newPossibleResearch()
 {
 	AccessScreen s = popupScreen("newPossibleResearch", is<NewPossibleResearchState>);
@@ -1243,7 +1376,7 @@ const std::vector<AccessScreen> &all()
 {
 	static const std::vector<AccessScreen> screens = {
 		mainMenu(), newBattle(), briefing(), inventory(), nextTurn(),
-		simpleScreen("craftInfo", is<CraftInfoState>),
+		craftInfo(),
 		simpleScreen("craftSoldiers", is<CraftSoldiersState>),
 		craftEquipment(),
 		simpleScreen("craftArmor", is<CraftArmorState>),
@@ -1289,6 +1422,8 @@ const std::vector<AccessScreen> &all()
 		popupScreen("confirmCydonia", is<ConfirmCydoniaState>),
 		popupScreen("dogfightError", is<DogfightErrorState>),
 		simpleScreen("ufopaediaSelect", is<UfopaediaSelectState>),
+		basescape(),
+		crafts(),
 	};
 	return screens;
 }

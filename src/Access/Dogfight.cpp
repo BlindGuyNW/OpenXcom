@@ -22,6 +22,7 @@
 #include <map>
 #include <vector>
 #include "Controls.h"
+#include "Navigator.h"
 #include "Speech.h"
 #include "Vocab.h"
 #include "../Engine/Game.h"
@@ -60,6 +61,18 @@ namespace
 	std::map<DogfightState *, Watch> _watch;
 	/// The last status id each window got, to drop the outrunning message the game re-sets every tick.
 	std::map<DogfightState *, std::string> _lastStatus;
+	/// A number per window, never reused, for its node ids: the game reuses interception
+	/// numbers, and a new window must not inherit the last one's cursor.
+	std::map<DogfightState *, int> _serials;
+	int _nextSerial = 0;
+
+	std::string keyFor(DogfightState *d)
+	{
+		std::map<DogfightState *, int>::iterator it = _serials.find(d);
+		if (it == _serials.end())
+			it = _serials.insert(std::make_pair(d, ++_nextSerial)).first;
+		return "dogfight:" + std::to_string(it->second) + ":";
+	}
 
 	Language *lang()
 	{
@@ -153,7 +166,7 @@ namespace
 		GeoscapeState *geo = static_cast<GeoscapeState *>(state);
 		for (DogfightState *d : openDogfights(geo))
 		{
-			std::string key = "dogfight:" + std::to_string(d->getInterceptionNumber()) + ":";
+			std::string key = keyFor(d);
 			b.PushContext(Vocab::format(Vocab::DF_TITLE, { d->getCraft()->getName(lang()), d->getUfo()->getName(lang()) }));
 
 			b.AddItem(ControlId::Referenced(d, key + "info"), textNode([d]
@@ -214,6 +227,7 @@ void update(GeoscapeState *geo)
 		_geo = geo;
 		_watch.clear();
 		_lastStatus.clear();
+		_serials.clear();
 	}
 	const std::list<DogfightState *> &live = geo->getDogfights();
 	for (std::map<DogfightState *, Watch>::iterator i = _watch.begin(); i != _watch.end();)
@@ -223,6 +237,7 @@ void update(GeoscapeState *geo)
 			if (i->second.open)
 				Speech::say(Vocab::format(Vocab::DF_OVER, { i->second.craft }), false);
 			_lastStatus.erase(i->first);
+			_serials.erase(i->first);
 			i = _watch.erase(i);
 		}
 		else
@@ -242,7 +257,11 @@ void update(GeoscapeState *geo)
 			snapshot(d, w);
 			_watch[d] = w;
 			if (open)
+			{
 				narrate(d, Vocab::format(Vocab::DF_START, { w.craft, d->getUfo()->getName(lang()) }));
+				// A new window starts at its top, not wherever the last one was left.
+				Navigator::focus(geo, ControlId::Referenced(d, keyFor(d) + "info"));
+			}
 			continue;
 		}
 		Watch &w = it->second;
