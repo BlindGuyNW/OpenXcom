@@ -34,6 +34,7 @@
 #include "../Engine/Logger.h"
 #include "../Engine/Options.h"
 #include "../Engine/State.h"
+#include "../Engine/Unicode.h"
 #include "../Interface/TextEdit.h"
 
 namespace OpenXcom
@@ -213,16 +214,80 @@ namespace
 		return dynamic_cast<BattlescapeState *>(topState());
 	}
 
-	/// Is a text field taking typing? Then the layer stands down entirely (spec 8).
-	bool textFieldLive()
+	/// The top state's text field that's taking typing, if any. The layer stands down while
+	/// there is one (spec 8), apart from echoing what the typing does.
+	TextEdit *focusedEdit()
 	{
-		for (Surface *s : _state->getSurfaces())
+		State *top = topState();
+		if (!top)
+			return 0;
+		for (Surface *s : top->getSurfaces())
 		{
 			TextEdit *edit = dynamic_cast<TextEdit *>(s);
 			if (edit && edit->isFocused())
-				return true;
+				return edit;
 		}
-		return false;
+		return 0;
+	}
+
+	/// The field being echoed and what it held last frame.
+	TextEdit *_edit = 0;
+	UString _editText;
+	size_t _editCaret = 0;
+
+	/// A field's whole text, or "blank".
+	std::string fieldText(TextEdit *edit)
+	{
+		std::string text = edit->getText();
+		return text.empty() ? Vocab::get(Vocab::BLANK) : text;
+	}
+
+	/// Characters as a screen reader echoes them: a lone space would be silent, so it's named.
+	std::string charsText(const UString &chars)
+	{
+		if (chars.empty())
+			return Vocab::get(Vocab::BLANK);
+		if (chars == UString(1, ' '))
+			return Vocab::get(Vocab::SPACE);
+		return Unicode::convUtf32ToUtf8(chars);
+	}
+
+	/// The typing echo: a differ over the focused field's text and caret.
+	/// Says the field on focus, then what each keypress typed or deleted, or the character the caret moved onto.
+	void watchEdit()
+	{
+		TextEdit *edit = focusedEdit();
+		if (!edit)
+		{
+			_edit = 0;
+			return;
+		}
+		UString text = Unicode::convUtf8ToUtf32(edit->getText());
+		size_t caret = edit->getCaretPos();
+		if (edit != _edit)
+		{
+			say(Vocab::format(Vocab::EDITING, { fieldText(edit) }), true);
+		}
+		else if (text != _editText)
+		{
+			// What changed sits between the common start and the common end.
+			size_t start = 0;
+			while (start < text.size() && start < _editText.size() && text[start] == _editText[start])
+				++start;
+			size_t end = 0;
+			while (end < text.size() - start && end < _editText.size() - start &&
+				text[text.size() - 1 - end] == _editText[_editText.size() - 1 - end])
+				++end;
+			UString typed = text.substr(start, text.size() - start - end);
+			say(charsText(typed.empty() ? _editText.substr(start, _editText.size() - start - end) : typed), true);
+		}
+		else if (caret != _editCaret)
+		{
+			say(charsText(caret < text.size() ? text.substr(caret, 1) : UString()), true);
+		}
+		_edit = edit;
+		_editText = text;
+		_editCaret = caret;
 	}
 
 	/// Acts on a key-down for the attached screen. Returns whether the layer owns the key.
@@ -338,12 +403,17 @@ bool handleEvent(Game *game, const SDL_Event &ev)
 		Speech::repeatLast();
 		claimed = true;
 	}
+	else if (ctrl && !alt && !shift && key == SDLK_l && focusedEdit())
+	{
+		say(fieldText(focusedEdit()), true);
+		claimed = true;
+	}
 	else if (!alt)
 	{
 		sync();
 		if (_graph)
 		{
-			if (!textFieldLive())
+			if (!focusedEdit())
 				claimed = dispatch(key, shift, ctrl);
 		}
 		else if (BattlescapeState *battle = battleOnTop())
@@ -363,6 +433,7 @@ void update(Game *game)
 	// Reading it now would announce half-built screens.
 	if (!game->isStateInitialized())
 		return;
+	guarded("edit echo", [] { watchEdit(); });
 	sync();
 	if (!_screen)
 	{

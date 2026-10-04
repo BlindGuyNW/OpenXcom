@@ -149,7 +149,7 @@ Read `CLAUDE.md` first (layer architecture, axioms, build). This doc says what t
 1. **`>` becomes a colon** in `Speech::normalize`: `>` followed by a space becomes `:`, otherwise `: `. Do it in M0. It applies everywhere, battle text included ("TURN: 1").
 2. **Dogfights run at the slowest speed**: force `Options::dogfightSpeed` to its slowest value at layer init, the way `Battle` forces `battleNewPreviewPath`. No hold key for now. The player's choices in a fight are few (attack mode, weapon on/off, minimize, view the UFO); firing and hits are automatic, so narration plus the slow speed should be enough. Revisit after a playtest.
 3. **Escape keeps the game's behaviour** on every popup for now, including `ConfirmLandingState` (Escape = the craft goes home). Don't add `back` overrides; do make sure each popup's arrival text makes the buttons' meaning clear.
-4. **No typing echo yet.**
+4. **No typing echo yet.** Reversed after the first try: the user couldn't tell what was in the field, so typing is now echoed.
 5. **The globe scanner sorts nearest to the selected base** (the first base until there's a way to choose). Base placement isn't the scanner: it's the city picker, grouped by region and country.
 
 ## 5. Not covered by the survey

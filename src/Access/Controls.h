@@ -77,7 +77,7 @@ namespace Controls
 	/// the label is read again, since it's usually the value the arrow changes.
 	Graph::NodeVtable arrowButton(State *state, ArrowButton *arrow, std::function<std::string()> label);
 	/// A node for a text field: its text as the label, Enter focuses it for typing.
-	/// The navigator stands down while it has focus.
+	/// The navigator stands down while it has focus, apart from echoing the typing.
 	Graph::NodeVtable textEdit(State *state, TextEdit *edit);
 	/// A node for a slider: Left/Right change the value (Shift for bigger steps) and run its change handler.
 	Graph::NodeVtable slider(State *state, Slider *slider, const std::string &label);

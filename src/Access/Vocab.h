@@ -172,6 +172,8 @@ namespace Vocab
 		ARROW_RIGHT,
 		ROLE_EDIT,
 		EDITING,
+		BLANK,
+		SPACE,
 		COUNT
 	};
 

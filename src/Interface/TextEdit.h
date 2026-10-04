@@ -69,6 +69,8 @@ public:
 	void setText(const std::string &text);
 	/// Gets the text edit's string.
 	std::string getText() const;
+	/// Gets the caret position, in characters from the start.
+	size_t getCaretPos() const { return _caretPos; }
 	/// Sets the text edit's wordwrap setting.
 	void setWordWrap(bool wrap);
 	/// Sets the text edit's color invert setting.

@@ -209,8 +209,8 @@ NodeVtable textEdit(State *state, TextEdit *edit)
 	NodeVtable v;
 	v.Type = &editType();
 	v.Announcements.push_back(NodeAnnouncement([edit] { return edit->getText(); }, false, AnnouncementKinds::Label));
+	// The navigator's typing echo says "Editing" once the field has focus.
 	v.OnActivate = [state, edit] { click(state, edit); };
-	v.StateText = [edit] { return edit->isFocused() ? Vocab::format(Vocab::EDITING, { edit->getText() }) : std::string(); };
 	return v;
 }
 

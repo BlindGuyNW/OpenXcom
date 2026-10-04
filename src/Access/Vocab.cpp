@@ -168,7 +168,9 @@ namespace
 		"left arrow",
 		"right arrow",
 		"edit",
-		"Editing {0}. Type, then Enter to finish",
+		"Editing {0}. Type, then Enter to finish. Ctrl+L reads the field",
+		"blank",
+		"space",
 	};
 }
 
