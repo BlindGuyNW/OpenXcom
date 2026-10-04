@@ -4,7 +4,8 @@ A personal accessibility fork of OpenXcom (vanilla, SDL 1.2) for playing with a 
 
 ## Scope
 
-- v1 is the **tactical layer** (Battlescape) plus the menus needed to reach it: main menu → New Battle (`Menu/NewBattleState`). The Geoscape and base building are out of scope until asked for.
+- v1 was the **tactical layer** (Battlescape) plus the menus needed to reach it: main menu → New Battle (`Menu/NewBattleState`). It's playable end to end.
+- v2 (asked for 2026-10-04) is the **campaign**: Geoscape, interception, base management. The plan is in `docs/geoscape-plan.md`; read it before starting campaign work.
 - Repurposing keys or degrading the sighted/mouse UX is fine when it's needed.
 - Windows only for speech. Other platforms may compile, but speech is a no-op there.
 
@@ -103,6 +104,8 @@ The design follows the Graph A11y Kernel spec at `C:\git\sims2access\docs\graph-
 4. Map exploration layer: tile cursor, confirm via `primaryAction`, selection/cursor differ, parity gating (cursor and scanner in)
 5. ~~Action menu~~, aiming, ~~enemy list (the scanner)~~, event narration (in: spotted, down, our soldiers hit, shot results); medikit screen in; still to do: alien turn movement
 6. Inventory (first pass in; not yet: Ctrl+click quick move, priming in pre-battle equip)
+
+7. Campaign (v2): milestones M0 to M4 in `docs/geoscape-plan.md`, starting with M0 infrastructure. Its open questions go to the user before building.
 
 Next up, in order (agreed after the first full playtest):
 
