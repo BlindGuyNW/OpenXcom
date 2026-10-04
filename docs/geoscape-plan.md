@@ -105,7 +105,7 @@ Read `CLAUDE.md` first (layer architecture, axioms, build). This doc says what t
 
 ## 3. Milestones
 
-### M0: infrastructure (done 2026-10-04, untested in game)
+### M0: infrastructure (done 2026-10-04, played 2026-10-04)
 - `ErrorMessageState` recipe.
 - `AccessScreen::tick` (called by the navigator each frame while the recipe is active).
 - `TextButton` group accessor (`getGroup()`); speak "selected" for grouped buttons and pressed state for `ToggleTextButton`.
@@ -113,7 +113,7 @@ Read `CLAUDE.md` first (layer architecture, axioms, build). This doc says what t
 - `>` to colon in `Speech::normalize` (decision 1).
 - Force the slowest `Options::dogfightSpeed` (decision 2).
 
-### M1: start a campaign and let time run (done 2026-10-04, untested in game)
+### M1: start a campaign and let time run (done 2026-10-04, played 2026-10-04)
 Not done yet: narrating the silent events (decision 2's queued narration: craft home, UFO landing or taking off, and so on). The ConfirmNewBase, BaseName and popup recipes are plain `simpleScreen`/`popupScreen`; check their wording in play.
 - `NewGameState`: difficulty group (selected state), ironman toggle, OK.
 - `BuildNewBaseState`: city picker recipe (first base: no cost, no cancel). Then `BaseNameState` (TextEdit focused from the start; speak the title; Enter commits). `ConfirmNewBaseState` is `simpleScreen`.
@@ -122,7 +122,7 @@ Not done yet: narrating the silent events (decision 2's queued narration: craft 
 - The Ufopaedia start and select lists come free as `simpleScreen`; articles wait for M4.
 
 ### M2: intercept, fight, land, come home
-First half in (2026-10-04, untested): Intercept, SelectDestination, the dogfight module and recipe, ConfirmLanding, AliensCrash, BaseDestroyed, ConfirmCydonia, DogfightError. Still to do: CraftInfo, CraftWeapons, CraftSoldiers refusals, debriefing follow-ups, BaseDefense.
+First half in (2026-10-04, played and working 2026-10-04; AliensCrash, BaseDestroyed, ConfirmCydonia and DogfightError not yet seen in play): Intercept, SelectDestination, the dogfight module and recipe, ConfirmLanding, AliensCrash, BaseDestroyed, ConfirmCydonia, DogfightError. Still to do: CraftInfo, CraftWeapons, CraftSoldiers refusals, debriefing follow-ups, BaseDefense. Also agreed: a new interception should start focus at the top of its window (today the Geoscape's saved cursor puts it back where the last dogfight left off, since ids reuse the interception number).
 - `InterceptState`: rows as "name, status, base, N weapons, N soldiers, N HWPs" (accessor for its craft list or parse), refusal feedback when a craft can't go.
 - `SelectDestinationState` recipe (targets + cities, range).
 - Dogfight module and recipe.
