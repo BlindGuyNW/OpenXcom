@@ -32,6 +32,8 @@ namespace OpenXcom
 
 	class ArticleStateCraftWeapon : public ArticleState
 	{
+		/// Reads the article for the accessibility layer.
+		friend struct ArticleAccess;
 	public:
 		ArticleStateCraftWeapon(ArticleDefinitionCraftWeapon *article_defs);
 		virtual ~ArticleStateCraftWeapon();

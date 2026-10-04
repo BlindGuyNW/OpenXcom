@@ -216,6 +216,9 @@ namespace Vocab
 		BASES,
 		VALUE_OF,
 		HEADED_CELL,
+		LIST_EMPTY,
+		ARTICLE_PREV,
+		ARTICLE_NEXT,
 		COUNT
 	};
 

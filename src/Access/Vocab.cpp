@@ -213,6 +213,9 @@ namespace
 		"bases",
 		"{0} of {1}",
 		"{0}: {1}",
+		"empty",
+		"previous article",
+		"next article",
 	};
 }
 

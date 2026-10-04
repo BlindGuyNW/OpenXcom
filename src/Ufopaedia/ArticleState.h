@@ -45,6 +45,10 @@ namespace OpenXcom
 	public:
 		/// return the article id
 		std::string getId() const { return _id; }
+		// For the accessibility layer.
+		TextButton *getOkButton() const { return _btnOk; }
+		TextButton *getPrevButton() const { return _btnPrev; }
+		TextButton *getNextButton() const { return _btnNext; }
 
 	protected:
 

@@ -66,6 +66,15 @@
 #include "../Geoscape/UfoLostState.h"
 #include "../Ufopaedia/UfopaediaStartState.h"
 #include "../Ufopaedia/UfopaediaSelectState.h"
+#include "../Ufopaedia/ArticleStateArmor.h"
+#include "../Ufopaedia/ArticleStateBaseFacility.h"
+#include "../Ufopaedia/ArticleStateCraft.h"
+#include "../Ufopaedia/ArticleStateCraftWeapon.h"
+#include "../Ufopaedia/ArticleStateItem.h"
+#include "../Ufopaedia/ArticleStateText.h"
+#include "../Ufopaedia/ArticleStateTextImage.h"
+#include "../Ufopaedia/ArticleStateUfo.h"
+#include "../Ufopaedia/ArticleStateVehicle.h"
 #include "../Mod/City.h"
 #include "../Mod/RuleRegion.h"
 #include "../Savegame/Region.h"
@@ -134,6 +143,133 @@
 
 namespace OpenXcom
 {
+
+/**
+ * Reads a Ufopaedia article: a friend of each (UFO Defense) article class, since their
+ * fields are protected and their layouts differ. Stats come out as "label: value" lines.
+ */
+struct ArticleAccess
+{
+	/// A stats list's rows as "label: value"; the blank spacer rows are skipped.
+	static void listLines(TextList *list, std::vector<std::string> &out)
+	{
+		for (size_t row = 0; row < list->getTexts(); ++row)
+		{
+			std::string label = list->getCellCount(row) > 0 ? Controls::cellText(list, row, 0) : std::string();
+			std::string rest;
+			for (size_t c = 1; c < list->getCellCount(row); ++c)
+			{
+				std::string cell = Controls::cellText(list, row, c);
+				if (!cell.empty())
+					rest += (rest.empty() ? "" : ", ") + cell;
+			}
+			if (label.empty() && rest.empty())
+				continue;
+			out.push_back(rest.empty() ? label : Vocab::format(Vocab::HEADED_CELL, { label, rest }));
+		}
+	}
+
+	/// The shot table ("Auto Shot, ACCURACY: 35%, TIME UNIT COST: 35%"), then each ammo's damage
+	/// ("Rifle Clip, DAMAGE: Armor Piercing, 30"). Ammo is only pictures on screen, so it's named here;
+	/// the game leaves ammo whose article isn't available blank, and so does this.
+	static void itemLines(ArticleStateItem *a, std::vector<std::string> &out)
+	{
+		Mod *mod = State::getGamePtr()->getMod();
+		RuleItem *item = mod->getItem(a->getId(), true);
+		if (item->getBattleType() == BT_FIREARM)
+		{
+			for (size_t row = 0; row < a->_lstInfo->getTexts(); ++row)
+			{
+				if (a->_lstInfo->getCellCount(row) < 3)
+					continue;
+				out.push_back(Controls::cellText(a->_lstInfo, row, 0) + ", " +
+					Vocab::format(Vocab::HEADED_CELL, { a->_txtAccuracy->getText(), Controls::cellText(a->_lstInfo, row, 1) }) + ", " +
+					Vocab::format(Vocab::HEADED_CELL, { a->_txtTuCost->getText(), Controls::cellText(a->_lstInfo, row, 2) }));
+			}
+		}
+		std::vector<std::string> *ammo = item->getCompatibleAmmo();
+		for (size_t i = 0; i < 3; ++i)
+		{
+			std::string type = a->_txtAmmoType[i]->getText(), power = a->_txtAmmoDamage[i]->getText();
+			if (type.empty())
+				continue;
+			std::string line = Vocab::format(Vocab::HEADED_CELL, { std::string(a->tr("STR_DAMAGE_UC")), type + ", " + power });
+			if (item->getBattleType() == BT_FIREARM && i < ammo->size())
+				line = std::string(a->tr(mod->getItem((*ammo)[i], true)->getName())) + ", " + line;
+			out.push_back(line);
+		}
+	}
+
+	/// Splits a block of lines (the craft article's stats).
+	static void textLines(Text *text, std::vector<std::string> &out)
+	{
+		std::string s = text->getText();
+		size_t start = 0;
+		while (start <= s.size())
+		{
+			size_t end = s.find('\n', start);
+			if (end == std::string::npos)
+				end = s.size();
+			std::string line = s.substr(start, end - start);
+			if (!line.empty())
+				out.push_back(line);
+			start = end + 1;
+		}
+	}
+
+	/// The article's title, stat lines and description. False for article kinds it doesn't know (TFTD's).
+	static bool read(State *state, std::string &title, std::vector<std::string> &stats, std::string &info)
+	{
+		if (ArticleStateCraft *a = dynamic_cast<ArticleStateCraft *>(state))
+		{
+			title = a->_txtTitle->getText(); info = a->_txtInfo->getText();
+			textLines(a->_txtStats, stats);
+		}
+		else if (ArticleStateCraftWeapon *a = dynamic_cast<ArticleStateCraftWeapon *>(state))
+		{
+			title = a->_txtTitle->getText(); info = a->_txtInfo->getText();
+			listLines(a->_lstInfo, stats);
+		}
+		else if (ArticleStateItem *a = dynamic_cast<ArticleStateItem *>(state))
+		{
+			title = a->_txtTitle->getText(); info = a->_txtInfo->getText();
+			itemLines(a, stats);
+		}
+		else if (ArticleStateArmor *a = dynamic_cast<ArticleStateArmor *>(state))
+		{
+			title = a->_txtTitle->getText(); info = a->_txtInfo->getText();
+			listLines(a->_lstInfo, stats);
+		}
+		else if (ArticleStateBaseFacility *a = dynamic_cast<ArticleStateBaseFacility *>(state))
+		{
+			title = a->_txtTitle->getText(); info = a->_txtInfo->getText();
+			listLines(a->_lstInfo, stats);
+		}
+		else if (ArticleStateUfo *a = dynamic_cast<ArticleStateUfo *>(state))
+		{
+			title = a->_txtTitle->getText(); info = a->_txtInfo->getText();
+			listLines(a->_lstInfo, stats);
+		}
+		else if (ArticleStateVehicle *a = dynamic_cast<ArticleStateVehicle *>(state))
+		{
+			title = a->_txtTitle->getText(); info = a->_txtInfo->getText();
+			listLines(a->_lstStats, stats);
+		}
+		else if (ArticleStateText *a = dynamic_cast<ArticleStateText *>(state))
+		{
+			title = a->_txtTitle->getText(); info = a->_txtInfo->getText();
+		}
+		else if (ArticleStateTextImage *a = dynamic_cast<ArticleStateTextImage *>(state))
+		{
+			title = a->_txtTitle->getText(); info = a->_txtInfo->getText();
+		}
+		else
+		{
+			return false;
+		}
+		return true;
+	}
+};
 
 namespace Screens
 {
@@ -311,9 +447,15 @@ void addWidgets(GraphBuilder &b, State *state, const Customizer &customize)
 		}
 		else if (TextList *list = dynamic_cast<TextList *>(w.surface))
 		{
-			if (list->getTexts() == 0)
-				continue;
 			b.PushContext(Vocab::get(Vocab::LIST));
+			if (list->getTexts() == 0)
+			{
+				NodeVtable empty;
+				empty.Announcements.push_back(NodeAnnouncement([] { return Vocab::get(Vocab::LIST_EMPTY); }, false, AnnouncementKinds::Label));
+				b.AddItem(ControlId::Referenced(list, "widget:" + std::to_string(w.index) + ":empty"), empty);
+				b.PopContext();
+				continue;
+			}
 			for (size_t row = 0; row < list->getTexts(); ++row)
 			{
 				NodeVtable v = Controls::listRow(state, list, row);
@@ -1553,6 +1695,62 @@ AccessScreen researchInfo()
 	return s;
 }
 
+/// A Ufopaedia article: says the title on arrival, then lists the stats ("DAMAGE: 70"), the
+/// description, OK and the previous and next buttons. Left/Right page through the articles from
+/// anywhere, as the game's own arrow keys do. Other kinds (TFTD's) fall back to reading the screen.
+AccessScreen article()
+{
+	AccessScreen s;
+	s.key = "article";
+	s.isActive = is<ArticleState>;
+	s.name = [](State *state)
+	{
+		std::string title, info;
+		std::vector<std::string> stats;
+		return ArticleAccess::read(state, title, stats, info) ? title : allText(state);
+	};
+	s.build = [](GraphBuilder &b, State *state)
+	{
+		ArticleState *a = static_cast<ArticleState *>(state);
+		std::function<void(int, bool)> page = [state, a](int sign, bool)
+		{
+			Controls::click(state, sign < 0 ? a->getPrevButton() : a->getNextButton());
+		};
+		std::string title, info;
+		std::vector<std::string> stats;
+		if (!ArticleAccess::read(state, title, stats, info))
+		{
+			addWidgets(b, state, [page](Surface *, size_t, NodeVtable &v) { v.OnAdjust = page; });
+			return;
+		}
+		for (size_t i = 0; i < stats.size(); ++i)
+		{
+			NodeVtable v;
+			std::string line = stats[i];
+			v.Announcements.push_back(NodeAnnouncement([line] { return line; }, false, AnnouncementKinds::Label));
+			v.OnAdjust = page;
+			b.AddItem(ControlId::Referenced(a, "stat:" + std::to_string(i)), v);
+		}
+		if (!info.empty())
+		{
+			NodeVtable v;
+			v.Announcements.push_back(NodeAnnouncement([info] { return info; }, false, AnnouncementKinds::Label));
+			v.OnAdjust = page;
+			b.AddItem(ControlId::Structural("info"), v);
+		}
+		NodeVtable ok = Controls::textButton(state, a->getOkButton());
+		ok.OnAdjust = page;
+		b.AddItem(ControlId::Referenced(a->getOkButton(), "ok"), ok);
+		NodeVtable prev = Controls::labelledButton(state, a->getPrevButton(), Vocab::get(Vocab::ARTICLE_PREV));
+		prev.OnAdjust = page;
+		b.AddItem(ControlId::Referenced(a->getPrevButton(), "prev"), prev);
+		NodeVtable next = Controls::labelledButton(state, a->getNextButton(), Vocab::get(Vocab::ARTICLE_NEXT));
+		next.OnAdjust = page;
+		b.AddItem(ControlId::Referenced(a->getNextButton(), "next"), next);
+	};
+	return s;
+}
+
 AccessScreen newPossibleResearch()
 {
 	AccessScreen s = popupScreen("newPossibleResearch", is<NewPossibleResearchState>);
@@ -1625,6 +1823,7 @@ const std::vector<AccessScreen> &all()
 		research(),
 		tableScreen("newResearchList", is<NewResearchListState>, {}),
 		researchInfo(),
+		article(),
 	};
 	return screens;
 }

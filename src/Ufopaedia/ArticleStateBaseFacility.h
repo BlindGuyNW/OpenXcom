@@ -34,6 +34,8 @@ namespace OpenXcom
 
 	class ArticleStateBaseFacility : public ArticleState
 	{
+		/// Reads the article for the accessibility layer.
+		friend struct ArticleAccess;
 	public:
 		ArticleStateBaseFacility(ArticleDefinitionBaseFacility *article_defs);
 		virtual ~ArticleStateBaseFacility();
