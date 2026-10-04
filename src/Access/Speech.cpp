@@ -17,6 +17,7 @@
  * along with OpenXcom.  If not, see <http://www.gnu.org/licenses/>.
  */
 #include "Speech.h"
+#include <cctype>
 #include <chrono>
 #include <cstdio>
 #include <vector>
@@ -276,9 +277,14 @@ std::string normalize(const std::string &text)
 		}
 		else if (c == 0xC2 && i + 1 < text.size() && (unsigned char)text[i + 1] == Unicode::TOK_NBSP)
 		{
-			// UTF-8 non-breaking space
-			isSpace = true;
+			// UTF-8 non-breaking space. Between digits it's Unicode::formatNumber's thousands
+			// separator ("8 000"), which screen readers say as separate numbers, so it goes.
 			++i;
+			bool digitBefore = !space && !out.empty() && isdigit((unsigned char)out.back());
+			bool digitAfter = i + 1 < text.size() && isdigit((unsigned char)text[i + 1]);
+			if (digitBefore && digitAfter)
+				continue;
+			isSpace = true;
 		}
 		if (isSpace)
 		{
