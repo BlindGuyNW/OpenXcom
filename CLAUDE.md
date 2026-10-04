@@ -104,7 +104,7 @@ The design follows the Graph A11y Kernel spec at `C:\git\sims2access\docs\graph-
 4. Map exploration layer: tile cursor, confirm via `primaryAction`, selection/cursor differ, parity gating (cursor and scanner in)
 5. ~~Action menu~~, aiming, ~~enemy list (the scanner)~~, event narration (in: spotted, down, our soldiers hit, shot results); medikit screen in; still to do: alien turn movement
 6. Inventory (first pass in; not yet: Ctrl+click quick move, priming in pre-battle equip)
-7. Campaign (v2): milestones M0 to M4 in `docs/geoscape-plan.md`, starting with M0 infrastructure. Its open questions go to the user before building.
+7. Campaign (v2): milestones M0 to M4 in `docs/geoscape-plan.md`, starting with M0 infrastructure. The user's decisions are in its section 4.
 
 Next up, in order (agreed after the first full playtest):
 

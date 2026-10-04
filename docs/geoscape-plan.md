@@ -95,7 +95,7 @@ Read `CLAUDE.md` first (layer architecture, axioms, build). This doc says what t
 ## 2. Architecture decisions
 
 1. **Geoscape is a layer, not a graph** (like `Battle`): `src/Access/Geo.{h,cpp}`, handed keys and ticks when `GeoscapeState` is on top, no recipe matches and no dogfight window is open. Its HUD and clock would be mangled by the heuristics (ten clock fragments, two blank side buttons).
-2. **The globe is a list, not a cursor.** A scanner over what's on the globe, same keys as the battle map: Period/Comma step through the current category nearest first (nearest to what's being looked at, or to the selected base), Shift+Period/Comma change category (UFOs, alien sites, alien bases, our craft in flight, bases, waypoints), Enter opens it through `MultipleTargetsState`, Space speaks date, time, funds and speed. Keys 1 to 6 and the game's letter keys (I intercept, B bases, G graphs, U ufopaedia, F funding) already work and pass through. The layer narrates speed changes (a differ on `_timeSpeed`) and the silent events listed above, queued.
+2. **The globe is a list, not a cursor.** A scanner over what's on the globe, same keys as the battle map: Period/Comma step through the current category nearest first (nearest to the selected base, see decision 5), Shift+Period/Comma change category (UFOs, alien sites, alien bases, our craft in flight, bases, waypoints), Enter opens it through `MultipleTargetsState`, Space speaks date, time, funds and speed. Keys 1 to 6 and the game's letter keys (I intercept, B bases, G graphs, U ufopaedia, F funding) already work and pass through. The layer narrates speed changes (a differ on `_timeSpeed`) and the silent events listed above, queued.
 3. **Picking a place** (new base, craft destination) is a graph screen recipe on `BuildNewBaseState` / `SelectDestinationState`: cities grouped by region, each with country, cost (bases) or distance and in-range (craft: `Craft::getBaseRange`), plus current targets for destinations. Activation: centre the globe on it and `Controls::click` the globe, which runs the game's own handler and its checks. An arbitrary-point cursor can wait.
 4. **Dogfights:** a `Dogfight` module plus a recipe that matches `GeoscapeState` while a dogfight window is open. Needs `GeoscapeState::getDogfights()` and a `friend` on `DogfightState` (or accessors) for `_mode`, the mode buttons, `_btnUfo`, `_btnMinimize`, `_btnMinimizedIcon`, `_weapon1/2`, `_weapon1Enabled/2Enabled`, `_currentDist`, `_targetDist`, `_ufoBreakingOff`. One context per dogfight: the five modes (selected one marked), each weapon (name, ammo, in range, on/off), distance, craft damage %, minimize. Narration (queued, prefixed with the craft when there's more than one): `setStatus` messages, weapon out of ammo, entering/leaving weapon range, dogfight over with why.
 5. **Infrastructure first** (milestone 0) so every later screen benefits: `ErrorMessageState` recipe, `AccessScreen::tick`, group/toggle state in button announcements, `ArrowButton` and `TextEdit` ("rename") nodes in `addWidgets`, Escape decisions for the dangerous popups.
@@ -110,7 +110,8 @@ Read `CLAUDE.md` first (layer architecture, axioms, build). This doc says what t
 - `AccessScreen::tick` (called by the navigator each frame while the recipe is active).
 - `TextButton` group accessor (e.g. `isGroupSelected()`); speak "selected" for grouped buttons and pressed state for `ToggleTextButton`.
 - `addWidgets`: `ArrowButton` nodes (label from the text to its left) and a "rename" node for `TextEdit`s.
-- Decide open question 1 (`>`).
+- `>` to colon in `Speech::normalize` (decision 1).
+- Force the slowest `Options::dogfightSpeed` (decision 2).
 
 ### M1: start a campaign and let time run
 - `NewGameState`: difficulty group (selected state), ironman toggle, OK.
@@ -143,13 +144,13 @@ Read `CLAUDE.md` first (layer architecture, axioms, build). This doc says what t
 - Custom initial base (`PlaceLiftState`, `SelectStartFacilityState`), only if wanted.
 - Cutscenes and the end-game slideshow: probably just speak the text.
 
-## 4. Open questions for the user
+## 4. Decisions (answered by the user 2026-10-04)
 
-1. **`>` in game text.** Normalize it to a colon everywhere ("TURN: 1", "COST: $500,000")? It's in nearly every campaign screen. Earlier we left it; the campaign makes it much more frequent.
-2. **Dogfight speed.** Ticks are 20 to 50 ms, so a fight can be over before speech catches up. Options: set `Options::dogfightSpeed` to the slowest, add a layer key that holds the dogfight timer, or both.
-3. **Escape on `ConfirmLandingState`.** Leave it as the game's No (craft goes home) or make Escape do nothing there so it can't be hit by accident?
-4. **Typing echo.** Base, craft and soldier naming give no feedback while typing. Add an echo of typed characters and a read-back on Enter?
-5. **Scanner reference point.** Nearest to the globe's centre (what a sighted player is looking at) or to the selected base?
+1. **`>` becomes a colon** in `Speech::normalize`: `>` followed by a space becomes `:`, otherwise `: `. Do it in M0. It applies everywhere, battle text included ("TURN: 1").
+2. **Dogfights run at the slowest speed**: force `Options::dogfightSpeed` to its slowest value at layer init, the way `Battle` forces `battleNewPreviewPath`. No hold key for now. The player's choices in a fight are few (attack mode, weapon on/off, minimize, view the UFO); firing and hits are automatic, so narration plus the slow speed should be enough. Revisit after a playtest.
+3. **Escape keeps the game's behaviour** on every popup for now, including `ConfirmLandingState` (Escape = the craft goes home). Don't add `back` overrides; do make sure each popup's arrival text makes the buttons' meaning clear.
+4. **No typing echo yet.**
+5. **The globe scanner sorts nearest to the selected base** (the first base until there's a way to choose). Base placement isn't the scanner: it's the city picker, grouped by region and country.
 
 ## 5. Not covered by the survey
 - The Geoscape's Options button leads to the options screens, which aren't spoken (same as the battle).
