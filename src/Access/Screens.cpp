@@ -33,6 +33,13 @@
 #include "../Interface/TextButton.h"
 #include "../Menu/MainMenuState.h"
 #include "../Menu/NewBattleState.h"
+#include "../Menu/PauseState.h"
+#include "../Menu/AbandonGameState.h"
+#include "../Menu/ListLoadState.h"
+#include "../Menu/ListSaveState.h"
+#include "../Menu/DeleteGameState.h"
+#include "../Menu/ConfirmLoadState.h"
+#include "../Battlescape/AbortMissionState.h"
 #include "../Basescape/CraftArmorState.h"
 #include "../Basescape/CraftEquipmentState.h"
 #include "../Basescape/CraftInfoState.h"
@@ -924,6 +931,13 @@ const std::vector<AccessScreen> &all()
 		simpleScreen("soldierArmor", is<SoldierArmorState>),
 		soldierInfo(),
 		actionMenu(), primeGrenade(), medikit(), debriefing(),
+		simpleScreen("pause", is<PauseState>),
+		simpleScreen("abandonGame", is<AbandonGameState>),
+		simpleScreen("abortMission", is<AbortMissionState>),
+		simpleScreen("listLoad", is<ListLoadState>),
+		simpleScreen("listSave", is<ListSaveState>),
+		simpleScreen("deleteGame", is<DeleteGameState>),
+		simpleScreen("confirmLoad", is<ConfirmLoadState>),
 	};
 	return screens;
 }
