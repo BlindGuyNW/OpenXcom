@@ -155,6 +155,9 @@ namespace Vocab
 		ITEMS_LEFT,
 		CLOSE,
 		EQUIP_HINT,
+		IN_STORES,
+		STORES_UNLIMITED,
+		ON_CRAFT,
 		COUNT
 	};
 

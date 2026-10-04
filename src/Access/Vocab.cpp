@@ -152,6 +152,9 @@ namespace
 		"{0} left",
 		"close",
 		"Right moves one to the craft, Left one back to the stores. Shift for five, Ctrl for all",
+		"{0} in stores",
+		"unlimited in stores",
+		"{0} on craft",
 	};
 }
 

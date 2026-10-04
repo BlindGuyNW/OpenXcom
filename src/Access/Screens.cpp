@@ -771,6 +771,17 @@ AccessScreen medikit()
 	return s;
 }
 
+/// "Pistol, 4 in stores, 2 on craft". New Battle shows "-" for its unlimited stores.
+std::string equipRowText(TextList *list, size_t row)
+{
+	if (list->getCellCount(row) < 3)
+		return Controls::rowText(list, row);
+	std::string stores = Controls::cellText(list, row, 1);
+	return Controls::cellText(list, row, 0) + ", "
+		+ (stores == "-" ? Vocab::get(Vocab::STORES_UNLIMITED) : Vocab::format(Vocab::IN_STORES, { stores })) + ", "
+		+ Vocab::format(Vocab::ON_CRAFT, { Controls::cellText(list, row, 2) });
+}
+
 /// Moving items between the base's stores and the craft: Left/Right on a row, Shift for five.
 AccessScreen craftEquipment()
 {
@@ -794,12 +805,14 @@ AccessScreen craftEquipment()
 				else
 					equip->moveRightByValue(count);
 			};
+			v.Announcements.clear();
+			v.Announcements.push_back(NodeAnnouncement([list, row] { return equipRowText(list, row); }, false, AnnouncementKinds::Label));
 			// The game ignores clicks on the row itself, so Enter re-reads it with how to move items.
 			static bool hint = false;
 			v.OnActivate = [] { hint = true; };
 			v.StateText = [list, row]
 			{
-				std::string text = Controls::rowText(list, row);
+				std::string text = equipRowText(list, row);
 				if (hint)
 					text += ". " + Vocab::get(Vocab::EQUIP_HINT);
 				hint = false;
