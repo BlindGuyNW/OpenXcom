@@ -44,6 +44,8 @@ struct AccessScreen
 	std::function<std::string(State *)> name;
 	/// Escape. Optional; without it Escape goes to the game as usual.
 	std::function<void(State *)> back;
+	/// Called every frame while the recipe is attached, for narration that follows the game. Optional.
+	std::function<void(State *)> tick;
 };
 
 namespace Screens

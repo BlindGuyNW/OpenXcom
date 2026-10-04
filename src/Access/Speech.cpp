@@ -285,6 +285,15 @@ std::string normalize(const std::string &text)
 			space = !out.empty();
 			continue;
 		}
+		// The game's "label>value" separator ("TURN>1", "COST> $50") reads as a colon.
+		// Runs like ">>" are buttons and banners, so they stay.
+		bool lone = c == '>' && (i == 0 || text[i - 1] != '>') && (i + 1 == text.size() || text[i + 1] != '>');
+		if (lone && !out.empty())
+		{
+			out += ':';
+			space = true;
+			continue;
+		}
 		if (space)
 		{
 			out += ' ';

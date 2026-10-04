@@ -17,6 +17,7 @@
  * You should have received a copy of the GNU General Public License
  * along with OpenXcom.  If not, see <http://www.gnu.org/licenses/>.
  */
+#include <functional>
 #include <string>
 #include <SDL.h>
 #include "Graph/GraphTypes.hpp"
@@ -30,6 +31,8 @@ class TextButton;
 class ComboBox;
 class Slider;
 class TextList;
+class ArrowButton;
+class TextEdit;
 
 /**
  * Building blocks for graph screen recipes: the one control type registry
@@ -46,6 +49,8 @@ namespace Controls
 	const Graph::ControlType &comboBoxType();
 	/// The "slider" control type.
 	const Graph::ControlType &sliderType();
+	/// The "edit" control type.
+	const Graph::ControlType &editType();
 	/// Clicks a surface the way the mouse would: press, release, click.
 	/// Runs the surface's own handlers, so sounds and side effects match a real click.
 	void click(State *state, InteractiveSurface *surface, Uint8 mouseButton = SDL_BUTTON_LEFT);
@@ -60,12 +65,20 @@ namespace Controls
 	/// Enter left-clicks the row and Backspace right-clicks it.
 	Graph::NodeVtable listRow(State *state, TextList *list, size_t row);
 	/// A node for a text button: its visible text as the label, Enter clicks it.
+	/// Radio buttons (a button group) say "selected" on the chosen one; toggle buttons say on or off.
 	Graph::NodeVtable textButton(State *state, TextButton *button);
 	/// A node for a button without text of its own (an image button): the given label, Enter clicks it.
 	Graph::NodeVtable labelledButton(State *state, InteractiveSurface *button, const std::string &label);
 	/// A node for a combo box: Left/Right step through the options (Shift for bigger steps)
 	/// and run the box's change handler, as picking from the drop-down would.
 	Graph::NodeVtable comboBox(State *state, ComboBox *box, const std::string &label);
+	/// A node for an arrow button: the live label plus the arrow's direction, Enter clicks it,
+	/// Backspace right-clicks it (as far as it goes, on the game's spinners). After either,
+	/// the label is read again, since it's usually the value the arrow changes.
+	Graph::NodeVtable arrowButton(State *state, ArrowButton *arrow, std::function<std::string()> label);
+	/// A node for a text field: its text as the label, Enter focuses it for typing.
+	/// The navigator stands down while it has focus.
+	Graph::NodeVtable textEdit(State *state, TextEdit *edit);
 	/// A node for a slider: Left/Right change the value (Shift for bigger steps) and run its change handler.
 	Graph::NodeVtable slider(State *state, Slider *slider, const std::string &label);
 }

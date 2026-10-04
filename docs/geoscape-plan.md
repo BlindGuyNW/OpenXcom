@@ -105,10 +105,10 @@ Read `CLAUDE.md` first (layer architecture, axioms, build). This doc says what t
 
 ## 3. Milestones
 
-### M0: infrastructure
+### M0: infrastructure (done 2026-10-04, untested in game)
 - `ErrorMessageState` recipe.
 - `AccessScreen::tick` (called by the navigator each frame while the recipe is active).
-- `TextButton` group accessor (e.g. `isGroupSelected()`); speak "selected" for grouped buttons and pressed state for `ToggleTextButton`.
+- `TextButton` group accessor (`getGroup()`); speak "selected" for grouped buttons and pressed state for `ToggleTextButton`.
 - `addWidgets`: `ArrowButton` nodes (label from the text to its left) and a "rename" node for `TextEdit`s.
 - `>` to colon in `Speech::normalize` (decision 1).
 - Force the slowest `Options::dogfightSpeed` (decision 2).

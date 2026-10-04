@@ -22,10 +22,13 @@
 #include "../Engine/Action.h"
 #include "../Engine/InteractiveSurface.h"
 #include "../Engine/State.h"
+#include "../Interface/ArrowButton.h"
 #include "../Interface/ComboBox.h"
 #include "../Interface/Slider.h"
+#include "../Interface/TextEdit.h"
 #include "../Interface/TextList.h"
 #include "../Interface/TextButton.h"
+#include "../Interface/ToggleTextButton.h"
 
 namespace OpenXcom
 {
@@ -70,6 +73,12 @@ const ControlType &comboBoxType()
 const ControlType &sliderType()
 {
 	static const ControlType type = makeType("slider", Vocab::ROLE_SLIDER);
+	return type;
+}
+
+const ControlType &editType()
+{
+	static const ControlType type = makeType("edit", Vocab::ROLE_EDIT);
 	return type;
 }
 
@@ -151,6 +160,57 @@ NodeVtable textButton(State *state, TextButton *btn)
 	v.Type = &button();
 	v.Announcements.push_back(NodeAnnouncement([btn] { return btn->getText(); }, false, AnnouncementKinds::Label));
 	v.OnActivate = [state, btn] { click(state, btn); };
+	// Not the Selected kind: that would make the chosen button where focus lands.
+	std::function<std::string()> pressed;
+	if (ToggleTextButton *toggle = dynamic_cast<ToggleTextButton *>(btn))
+		pressed = [toggle] { return Vocab::get(toggle->getPressed() ? Vocab::ON : Vocab::OFF); };
+	else if (btn->getGroup())
+		pressed = [btn] { return *btn->getGroup() == btn ? Vocab::get(Vocab::SELECTED) : std::string(); };
+	if (pressed)
+	{
+		v.Announcements.push_back(NodeAnnouncement(pressed, false, "pressed"));
+		v.StateText = pressed;
+	}
+	return v;
+}
+
+NodeVtable arrowButton(State *state, ArrowButton *arrow, std::function<std::string()> label)
+{
+	Vocab::Id direction;
+	switch (arrow->getShape())
+	{
+	case ARROW_BIG_UP:
+	case ARROW_SMALL_UP:
+		direction = Vocab::ARROW_UP;
+		break;
+	case ARROW_BIG_DOWN:
+	case ARROW_SMALL_DOWN:
+		direction = Vocab::ARROW_DOWN;
+		break;
+	case ARROW_SMALL_LEFT:
+		direction = Vocab::ARROW_LEFT;
+		break;
+	default:
+		direction = Vocab::ARROW_RIGHT;
+		break;
+	}
+	NodeVtable v;
+	v.Type = &button();
+	v.Announcements.push_back(NodeAnnouncement(label, false, AnnouncementKinds::Label));
+	v.Announcements.push_back(NodeAnnouncement([direction] { return Vocab::get(direction); }, false, AnnouncementKinds::Value));
+	v.OnActivate = [state, arrow] { click(state, arrow); };
+	v.OnSecondary = [state, arrow] { click(state, arrow, SDL_BUTTON_RIGHT); };
+	v.StateText = label;
+	return v;
+}
+
+NodeVtable textEdit(State *state, TextEdit *edit)
+{
+	NodeVtable v;
+	v.Type = &editType();
+	v.Announcements.push_back(NodeAnnouncement([edit] { return edit->getText(); }, false, AnnouncementKinds::Label));
+	v.OnActivate = [state, edit] { click(state, edit); };
+	v.StateText = [edit] { return edit->isFocused() ? Vocab::format(Vocab::EDITING, { edit->getText() }) : std::string(); };
 	return v;
 }
 

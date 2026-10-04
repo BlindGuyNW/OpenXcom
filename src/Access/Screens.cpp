@@ -24,6 +24,7 @@
 #include <map>
 #include <tuple>
 #include "../Engine/State.h"
+#include "../Interface/ArrowButton.h"
 #include "../Interface/ComboBox.h"
 #include "../Interface/Frame.h"
 #include "../Interface/Slider.h"
@@ -39,6 +40,7 @@
 #include "../Menu/ListSaveState.h"
 #include "../Menu/DeleteGameState.h"
 #include "../Menu/ConfirmLoadState.h"
+#include "../Menu/ErrorMessageState.h"
 #include "../Battlescape/AbortMissionState.h"
 #include "../Basescape/CraftArmorState.h"
 #include "../Basescape/CraftEquipmentState.h"
@@ -184,7 +186,16 @@ std::string labelFor(State *state, Surface *target, bool sameRow = true)
 typedef std::function<void(Surface *, size_t, NodeVtable &)> Customizer;
 const size_t NO_ROW = (size_t)-1;
 
-/// Adds every visible button, combo box, slider and list of a state as a vertical list in reading order:
+/// Is this a widget addWidgets lists? Arrow buttons without an arrow are the load lists' sort toggles.
+bool isListedWidget(Surface *s)
+{
+	if (ArrowButton *arrow = dynamic_cast<ArrowButton *>(s))
+		return arrow->getShape() != ARROW_NONE;
+	return dynamic_cast<TextButton *>(s) || dynamic_cast<ComboBox *>(s) || dynamic_cast<Slider *>(s) ||
+		dynamic_cast<TextList *>(s) || dynamic_cast<TextEdit *>(s);
+}
+
+/// Adds every visible button, arrow button, text field, combo box, slider and list of a state as a vertical list in reading order:
 /// top to bottom, with each frame's controls together under the frame's heading.
 /// A list's rows sit together at the list's position, under a "list" heading.
 /// Keys are the widgets' indices among the state's elements, which only change if the state's code does.
@@ -207,7 +218,7 @@ void addWidgets(GraphBuilder &b, State *state, const Customizer &customize)
 	for (size_t i = 0; i < surfaces.size(); ++i)
 	{
 		Surface *s = surfaces[i];
-		if (s->getVisible() && (dynamic_cast<TextButton *>(s) || dynamic_cast<ComboBox *>(s) || dynamic_cast<Slider *>(s) || dynamic_cast<TextList *>(s)))
+		if (s->getVisible() && isListedWidget(s))
 			widgets.push_back(Widget{ i, s, frameFor(state, s) });
 	}
 	std::stable_sort(widgets.begin(), widgets.end(), [](const Widget &a, const Widget &b) { return a.order() < b.order(); });
@@ -231,6 +242,10 @@ void addWidgets(GraphBuilder &b, State *state, const Customizer &customize)
 			v = Controls::comboBox(state, box, labelFor(state, box));
 		else if (Slider *slider = dynamic_cast<Slider *>(w.surface))
 			v = Controls::slider(state, slider, labelFor(state, slider));
+		else if (ArrowButton *arrow = dynamic_cast<ArrowButton *>(w.surface))
+			v = Controls::arrowButton(state, arrow, [state, arrow] { return labelFor(state, arrow); });
+		else if (TextEdit *edit = dynamic_cast<TextEdit *>(w.surface))
+			v = Controls::textEdit(state, edit);
 		if (!v.Announcements.empty())
 		{
 			if (customize)
@@ -938,6 +953,7 @@ const std::vector<AccessScreen> &all()
 		simpleScreen("listSave", is<ListSaveState>),
 		simpleScreen("deleteGame", is<DeleteGameState>),
 		simpleScreen("confirmLoad", is<ConfirmLoadState>),
+		simpleScreen("errorMessage", is<ErrorMessageState>),
 	};
 	return screens;
 }

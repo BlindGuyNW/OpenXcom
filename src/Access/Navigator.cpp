@@ -32,6 +32,7 @@
 #include "../Battlescape/BattlescapeState.h"
 #include "../Engine/Game.h"
 #include "../Engine/Logger.h"
+#include "../Engine/Options.h"
 #include "../Engine/State.h"
 #include "../Interface/TextEdit.h"
 
@@ -58,6 +59,8 @@ namespace
 	std::set<SDLKey> _swallowed;
 	/// One fault log per attach (spec 7.9).
 	bool _faultLogged = false;
+	/// The top of the Geoscape options' dogfight speed slider, in ms per tick.
+	const int DOGFIGHT_SPEED_SLOWEST = 50;
 
 	void fault(const char *where, const char *what)
 	{
@@ -313,6 +316,8 @@ void init()
 	{
 		return Vocab::format(Vocab::POSITION, { std::to_string(index), std::to_string(count) });
 	};
+	// Dogfights tick every dogfightSpeed ms; the slowest the options allow gives speech a chance.
+	Options::dogfightSpeed = DOGFIGHT_SPEED_SLOWEST;
 }
 
 bool handleEvent(Game *game, const SDL_Event &ev)
@@ -364,6 +369,13 @@ void update(Game *game)
 		if (BattlescapeState *battle = battleOnTop())
 			guarded("battle update", [&] { Battle::update(battle); });
 		return;
+	}
+	if (_screen->tick)
+	{
+		guarded("tick", [&] { _screen->tick(_state); });
+		// The tick may have pushed or popped a state; the next frame attaches to it.
+		if (topState() != _state)
+			return;
 	}
 	if (!_graph || !_graph->Rerender())
 		return;

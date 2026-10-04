@@ -43,6 +43,7 @@ namespace Speech
 	/// Speaks the last non-empty text again, interrupting.
 	void repeatLast();
 	/// Strips game formatting codes and collapses whitespace into one line.
+	/// A lone ">" (the game's label separator) becomes a colon.
 	std::string normalize(const std::string &text);
 }
 

@@ -161,6 +161,14 @@ namespace
 		"waypoint removed, {0} left",
 		"waypoints cleared, still aiming",
 		"launch",
+		"on",
+		"off",
+		"up arrow",
+		"down arrow",
+		"left arrow",
+		"right arrow",
+		"edit",
+		"Editing {0}. Type, then Enter to finish",
 	};
 }
 
