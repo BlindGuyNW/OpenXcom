@@ -575,6 +575,53 @@ namespace
 	}
 
 	/// Enter: a left click on the cursor tile.
+	/// Blaster Launcher: a click only drops a waypoint, and the HUD's launch button fires.
+	/// Enter on the last waypoint stands in for that button.
+	void launchStep(BattlescapeState *state, Position target)
+	{
+		BattlescapeGame *bg = state->getBattleGame();
+		BattleAction *action = bg->getCurrentAction();
+		if (!action->waypoints.empty() && action->waypoints.back() == target)
+		{
+			say(Vocab::get(Vocab::LAUNCHED), true);
+			bg->launchAction();
+			_awaiting = bg->isBusy();
+			return;
+		}
+		size_t before = action->waypoints.size();
+		bg->primaryAction(target);
+		size_t count = action->waypoints.size();
+		if (count == before)
+		{
+			say(Vocab::get(Vocab::WAYPOINTS_FULL), true);
+			return;
+		}
+		// Same lookup as BattlescapeGame::primaryAction: the launcher's limit, else the missile's; -1 is unlimited.
+		int max = action->weapon->getRules()->getWaypoints();
+		if (max == 0 && action->weapon->getAmmoItem())
+			max = action->weapon->getAmmoItem()->getRules()->getWaypoints();
+		if (max > 0)
+			say(Vocab::format(Vocab::WAYPOINT_SET_OF, { num((int)count), num(max) }), true);
+		else
+			say(Vocab::format(Vocab::WAYPOINT_SET, { num((int)count) }), true);
+	}
+
+	/// Cancels like a right click and says what went: a launcher waypoint, else the aim or preview.
+	bool cancelAction(BattlescapeGame *bg)
+	{
+		BattleAction *action = bg->getCurrentAction();
+		bool launch = action->targeting && action->type == BA_LAUNCH;
+		size_t before = action->waypoints.size();
+		if (!bg->cancelCurrentAction())
+			return false;
+		size_t after = action->waypoints.size();
+		if (launch && after < before)
+			say(after ? Vocab::format(Vocab::WAYPOINT_REMOVED, { num((int)after) }) : Vocab::get(Vocab::WAYPOINTS_CLEARED), true);
+		else
+			say(Vocab::get(Vocab::CANCELLED), true);
+		return true;
+	}
+
 	void primary(BattlescapeState *state)
 	{
 		if (!canAct(state))
@@ -597,6 +644,11 @@ namespace
 		Tile *tile = save->getTile(target);
 		if (targeting && target.z > 0 && !tile->getUnit() && tile->hasNoFloor(save->getTile(target + Position(0, 0, -1))))
 			target = settleDown(save, target);
+		if (targeting && bg->getCurrentAction()->type == BA_LAUNCH)
+		{
+			launchStep(state, target);
+			return;
+		}
 		bg->primaryAction(target);
 		if (bg->isBusy())
 		{
@@ -628,11 +680,8 @@ namespace
 			return;
 		}
 		BattlescapeGame *bg = state->getBattleGame();
-		if (bg->cancelCurrentAction())
-		{
-			say(Vocab::get(Vocab::CANCELLED), true);
+		if (cancelAction(bg))
 			return;
-		}
 		if (!state->playableUnitSelected())
 		{
 			say(Vocab::get(Vocab::NO_SOLDIER), true);
@@ -1036,8 +1085,7 @@ bool handleKey(BattlescapeState *state, SDLKey key, bool shift, bool ctrl)
 	case SDLK_ESCAPE:
 		if (state->getBattleGame()->getCurrentAction()->targeting && canAct(state))
 		{
-			state->getBattleGame()->cancelCurrentAction();
-			say(Vocab::get(Vocab::CANCELLED), true);
+			cancelAction(state->getBattleGame());
 			return true;
 		}
 		return false;

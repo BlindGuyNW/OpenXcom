@@ -155,6 +155,12 @@ namespace
 		"{0} in stores",
 		"unlimited in stores",
 		"{0} on craft",
+		"waypoint {0}, Enter again here to launch",
+		"waypoint {0} of {1}, Enter again here to launch",
+		"no more waypoints, Enter on the last one to launch",
+		"waypoint removed, {0} left",
+		"waypoints cleared, still aiming",
+		"launch",
 	};
 }
 
