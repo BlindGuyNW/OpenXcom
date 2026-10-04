@@ -214,6 +214,8 @@ namespace Vocab
 		CRAFTS_ROW,
 		CRAFT_OUT,
 		BASES,
+		VALUE_OF,
+		HEADED_CELL,
 		COUNT
 	};
 

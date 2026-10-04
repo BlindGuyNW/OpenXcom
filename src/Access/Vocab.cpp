@@ -211,6 +211,8 @@ namespace
 		"{0}, {1}, {2} of {3} weapons, {4} soldiers, {5} tanks",
 		"Can't open: {0} is out",
 		"bases",
+		"{0} of {1}",
+		"{0}: {1}",
 	};
 }
 

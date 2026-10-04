@@ -49,6 +49,8 @@ public:
 	void btnOkClick(Action *action);
 	/// Handler for clicking the New Research button.
 	void btnNewClick(Action *action);
+	/// Gets the base (for the accessibility layer).
+	Base *getBase() const { return _base; }
 	/// Handler for clicking the ResearchProject list.
 	void onSelectProject(Action *action);
 	/// Fills the ResearchProject list with Base ResearchProjects.

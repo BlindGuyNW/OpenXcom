@@ -363,6 +363,32 @@ void BaseInfoState::init()
 }
 
 /**
+ * Gets the stat lines in screen order, for the accessibility layer.
+ * @return (label, value) pairs; a null value marks a section heading.
+ */
+std::vector<std::pair<Text *, Text *> > BaseInfoState::getLines() const
+{
+	std::vector<std::pair<Text *, Text *> > lines;
+	lines.push_back(std::make_pair(_txtPersonnel, (Text *)0));
+	lines.push_back(std::make_pair(_txtSoldiers, _numSoldiers));
+	lines.push_back(std::make_pair(_txtEngineers, _numEngineers));
+	lines.push_back(std::make_pair(_txtScientists, _numScientists));
+	lines.push_back(std::make_pair(_txtSpace, (Text *)0));
+	lines.push_back(std::make_pair(_txtQuarters, _numQuarters));
+	lines.push_back(std::make_pair(_txtStores, _numStores));
+	lines.push_back(std::make_pair(_txtLaboratories, _numLaboratories));
+	lines.push_back(std::make_pair(_txtWorkshops, _numWorkshops));
+	// Only created when storage limits are on.
+	if (Options::storageLimitsEnforced)
+		lines.push_back(std::make_pair(_txtContainment, _numContainment));
+	lines.push_back(std::make_pair(_txtHangars, _numHangars));
+	lines.push_back(std::make_pair(_txtDefense, _numDefense));
+	lines.push_back(std::make_pair(_txtShortRange, _numShortRange));
+	lines.push_back(std::make_pair(_txtLongRange, _numLongRange));
+	return lines;
+}
+
+/**
  * Changes the base name.
  * @param action Pointer to an action.
  */

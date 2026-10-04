@@ -87,7 +87,16 @@
 #include "../Battlescape/AbortMissionState.h"
 #include "../Basescape/CraftArmorState.h"
 #include "../Basescape/CraftEquipmentState.h"
+#include "../Basescape/BaseInfoState.h"
 #include "../Basescape/BasescapeState.h"
+#include "../Basescape/MonthlyCostsState.h"
+#include "../Basescape/NewResearchListState.h"
+#include "../Basescape/ResearchInfoState.h"
+#include "../Basescape/ResearchState.h"
+#include "../Basescape/SoldiersState.h"
+#include "../Basescape/StoresState.h"
+#include "../Basescape/TransfersState.h"
+#include "../Savegame/ResearchProject.h"
 #include "../Basescape/CraftInfoState.h"
 #include "../Basescape/CraftsState.h"
 #include "../Mod/RuleCraft.h"
@@ -1360,6 +1369,190 @@ AccessScreen craftInfo()
 	return s;
 }
 
+/// A table row with its columns named: "Pistol, QUANTITY: 2, SPACE USED: 1". The first cell names the row;
+/// headers are the game's string ids for the other columns, in order.
+std::string headedRow(State *state, TextList *list, size_t row, const std::vector<std::string> &headers)
+{
+	std::string s = Controls::cellText(list, row, 0);
+	for (size_t i = 0; i < headers.size() && i + 1 < list->getCellCount(row); ++i)
+		s += ", " + Vocab::format(Vocab::HEADED_CELL, { std::string(state->tr(headers[i])), Controls::cellText(list, row, i + 1) });
+	return s;
+}
+
+/// A screen with one table: says its title, then lists the rows with their columns named, and the buttons.
+AccessScreen tableScreen(const std::string &key, std::function<bool(State *)> isActive, const std::vector<std::string> &headers)
+{
+	AccessScreen s = simpleScreen(key, isActive);
+	s.name = firstText;
+	s.build = [headers](GraphBuilder &b, State *state)
+	{
+		addWidgets(b, state, [state, headers](Surface *surface, size_t row, NodeVtable &v)
+		{
+			TextList *list = dynamic_cast<TextList *>(surface);
+			if (!list || row == NO_ROW)
+				return;
+			v.Announcements.clear();
+			v.Announcements.push_back(NodeAnnouncement([state, list, row, headers] { return headedRow(state, list, row, headers); }, false, AnnouncementKinds::Label));
+		});
+	};
+	return s;
+}
+
+/// "5:7" as the base info screen writes its counts, said "5 of 7".
+std::string ofText(const std::string &value)
+{
+	size_t colon = value.find(':');
+	if (colon == std::string::npos)
+		return value;
+	return Vocab::format(Vocab::VALUE_OF, { value.substr(0, colon), value.substr(colon + 1) });
+}
+
+/// Base information, wired explicitly: the base name on arrival, then the personnel, space and
+/// defense lines (one context each), then the name field and the buttons. Its number keys switch
+/// bases like the Basescape's, and the tick says the new one.
+AccessScreen baseInfo()
+{
+	static Base *shown = 0;
+	AccessScreen s;
+	s.key = "baseInfo";
+	s.isActive = is<BaseInfoState>;
+	s.name = [](State *state)
+	{
+		shown = static_cast<BaseInfoState *>(state)->getBase();
+		return shown->getName();
+	};
+	s.build = [](GraphBuilder &b, State *state)
+	{
+		BaseInfoState *bi = static_cast<BaseInfoState *>(state);
+		bool open = false;
+		for (const std::pair<Text *, Text *> &line : bi->getLines())
+		{
+			Text *label = line.first, *value = line.second;
+			if (!value)
+			{
+				if (open)
+					b.PopContext();
+				b.PushContext(label->getText());
+				open = true;
+				continue;
+			}
+			addLine(b, ControlId::Referenced(label, "line:" + label->getText()), [label, value]
+			{
+				return label->getText() + ", " + ofText(value->getText());
+			});
+		}
+		if (open)
+			b.PopContext();
+		addWidgets(b, state);
+	};
+	s.tick = [](State *state)
+	{
+		Base *base = static_cast<BaseInfoState *>(state)->getBase();
+		if (base == shown)
+			return;
+		shown = base;
+		Speech::say(base->getName(), true);
+	};
+	return s;
+}
+
+/// Monthly costs: the title and income on arrival, then craft rental and salaries with their
+/// columns named, then maintenance and the total.
+AccessScreen monthlyCosts()
+{
+	AccessScreen s;
+	s.key = "monthlyCosts";
+	s.isActive = is<MonthlyCostsState>;
+	s.name = [](State *state)
+	{
+		return firstText(state) + ". " + static_cast<MonthlyCostsState *>(state)->getIncomeText()->getText();
+	};
+	s.build = [](GraphBuilder &b, State *state)
+	{
+		MonthlyCostsState *mc = static_cast<MonthlyCostsState *>(state);
+		std::vector<std::string> headers = { "STR_COST_PER_UNIT", "STR_QUANTITY", "STR_TOTAL" };
+		std::pair<const char *, TextList *> tables[] = { { "STR_CRAFT_RENTAL", mc->getCraftList() }, { "STR_SALARIES", mc->getSalaryList() } };
+		for (const std::pair<const char *, TextList *> &t : tables)
+		{
+			TextList *list = t.second;
+			b.PushContext(state->tr(t.first));
+			for (size_t row = 0; row < list->getTexts(); ++row)
+				addLine(b, ControlId::Referenced(list, std::string(t.first) + ":" + std::to_string(row)), [state, list, row, headers] { return headedRow(state, list, row, headers); });
+			b.PopContext();
+		}
+		TextList *rest[] = { mc->getMaintenanceList(), mc->getTotalList() };
+		for (size_t i = 0; i < 2; ++i)
+		{
+			TextList *list = rest[i];
+			for (size_t row = 0; row < list->getTexts(); ++row)
+				addLine(b, ControlId::Referenced(list, "rest:" + std::to_string(i) + ":" + std::to_string(row)), [list, row] { return Controls::rowText(list, row); });
+		}
+		b.AddItem(ControlId::Referenced(mc->getOkButton(), "ok"), Controls::textButton(state, mc->getOkButton()));
+	};
+	return s;
+}
+
+/// Current research: the scientists and lab space on arrival, then the projects with their columns named
+/// (Enter opens one to change its scientists), New Project and OK.
+AccessScreen research()
+{
+	AccessScreen s = tableScreen("research", is<ResearchState>, { "STR_SCIENTISTS_ALLOCATED_UC", "STR_PROGRESS" });
+	s.name = [](State *state)
+	{
+		Base *base = static_cast<ResearchState *>(state)->getBase();
+		return firstText(state) + ". " +
+			std::string(state->tr("STR_SCIENTISTS_AVAILABLE").arg(base->getAvailableScientists())) + ". " +
+			std::string(state->tr("STR_SCIENTISTS_ALLOCATED").arg(base->getAllocatedScientists())) + ". " +
+			std::string(state->tr("STR_LABORATORY_SPACE_AVAILABLE").arg(base->getFreeLaboratories())) + ".";
+	};
+	return s;
+}
+
+/// A research project's scientists: allocated, then what's free, in the game's words.
+std::string scientistsText(ResearchInfoState *ri)
+{
+	Base *base = ri->getBase();
+	return std::string(ri->tr("STR_SCIENTISTS_ALLOCATED").arg(ri->getProject()->getAssigned())) + ", " +
+		std::string(ri->tr("STR_SCIENTISTS_AVAILABLE_UC").arg(base->getAvailableScientists())) + ", " +
+		std::string(ri->tr("STR_LABORATORY_SPACE_AVAILABLE_UC").arg(base->getFreeLaboratories()));
+}
+
+/// Allocating scientists to a project: the project and the counts on arrival, then the scientists
+/// as one adjustable node (Left/Right one, Shift five, Ctrl all), then OK (or Start Project) and Cancel.
+AccessScreen researchInfo()
+{
+	AccessScreen s;
+	s.key = "researchInfo";
+	s.isActive = is<ResearchInfoState>;
+	s.name = [](State *state)
+	{
+		return firstText(state) + ". " + scientistsText(static_cast<ResearchInfoState *>(state));
+	};
+	s.build = [](GraphBuilder &b, State *state)
+	{
+		ResearchInfoState *ri = static_cast<ResearchInfoState *>(state);
+		NodeVtable v;
+		v.Type = &Controls::sliderType();
+		v.Announcements.push_back(NodeAnnouncement([ri]
+		{
+			return std::string(ri->tr("STR_SCIENTISTS_ALLOCATED").arg(ri->getProject()->getAssigned()));
+		}, false, AnnouncementKinds::Label));
+		v.OnAdjust = [ri](int sign, bool large)
+		{
+			int count = std::abs(sign) >= Controls::ADJUST_LIMIT ? INT_MAX : (large ? 5 : 1);
+			if (sign < 0)
+				ri->lessByValue(count);
+			else
+				ri->moreByValue(count);
+		};
+		v.StateText = [ri] { return scientistsText(ri); };
+		b.AddItem(ControlId::Referenced(ri->getProject(), "scientists"), v);
+		b.AddItem(ControlId::Referenced(ri->getOkButton(), "ok"), Controls::textButton(state, ri->getOkButton()));
+		b.AddItem(ControlId::Referenced(ri->getCancelButton(), "cancel"), Controls::textButton(state, ri->getCancelButton()));
+	};
+	return s;
+}
+
 AccessScreen newPossibleResearch()
 {
 	AccessScreen s = popupScreen("newPossibleResearch", is<NewPossibleResearchState>);
@@ -1424,6 +1617,14 @@ const std::vector<AccessScreen> &all()
 		simpleScreen("ufopaediaSelect", is<UfopaediaSelectState>),
 		basescape(),
 		crafts(),
+		baseInfo(),
+		monthlyCosts(),
+		tableScreen("stores", is<StoresState>, { "STR_QUANTITY_UC", "STR_SPACE_USED_UC" }),
+		tableScreen("transfers", is<TransfersState>, { "STR_QUANTITY_UC", "STR_ARRIVAL_TIME_HOURS" }),
+		tableScreen("soldiers", is<SoldiersState>, {}),
+		research(),
+		tableScreen("newResearchList", is<NewResearchListState>, {}),
+		researchInfo(),
 	};
 	return screens;
 }
