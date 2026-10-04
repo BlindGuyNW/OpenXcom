@@ -113,7 +113,8 @@ Read `CLAUDE.md` first (layer architecture, axioms, build). This doc says what t
 - `>` to colon in `Speech::normalize` (decision 1).
 - Force the slowest `Options::dogfightSpeed` (decision 2).
 
-### M1: start a campaign and let time run
+### M1: start a campaign and let time run (done 2026-10-04, untested in game)
+Not done yet: narrating the silent events (decision 2's queued narration: craft home, UFO landing or taking off, and so on). The ConfirmNewBase, BaseName and popup recipes are plain `simpleScreen`/`popupScreen`; check their wording in play.
 - `NewGameState`: difficulty group (selected state), ironman toggle, OK.
 - `BuildNewBaseState`: city picker recipe (first base: no cost, no cancel). Then `BaseNameState` (TextEdit focused from the start; speak the title; Enter commits). `ConfirmNewBaseState` is `simpleScreen`.
 - `Geo` layer: time/date/funds readout, speed differ, scanner, open target.

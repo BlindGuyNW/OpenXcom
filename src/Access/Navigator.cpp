@@ -24,6 +24,7 @@
 #include <set>
 #include "Battle.h"
 #include "Controls.h"
+#include "Geo.h"
 #include "Screens.h"
 #include "Speech.h"
 #include "Vocab.h"
@@ -31,6 +32,8 @@
 #include "Graph/KeyGraph.hpp"
 #include "../Battlescape/BattlescapeState.h"
 #include "../Engine/Game.h"
+#include "../Geoscape/DogfightState.h"
+#include "../Geoscape/GeoscapeState.h"
 #include "../Engine/Logger.h"
 #include "../Engine/Options.h"
 #include "../Engine/State.h"
@@ -68,7 +71,10 @@ namespace
 		if (_faultLogged)
 			return;
 		_faultLogged = true;
-		Log(LOG_ERROR) << "Access: " << (_screen ? _screen->key : std::string("?")) << " " << where << " threw: " << what;
+		std::string key = _screen ? _screen->key : std::string("?");
+		Log(LOG_ERROR) << "Access: " << key << " " << where << " threw: " << what;
+		// Said too, queued: a fault otherwise shows up only as a screen that goes quiet.
+		Speech::say(Vocab::format(Vocab::ACCESS_FAULT, { key, where, what }), false);
 	}
 
 	/// Runs a host callback, logging instead of letting a throw reach the game loop.
@@ -214,6 +220,22 @@ namespace
 		return dynamic_cast<BattlescapeState *>(topState());
 	}
 
+	/// The Geoscape, when it's the top state, has finished init() and no dogfight window is open.
+	GeoscapeState *geoOnTop()
+	{
+		if (!_game->isStateInitialized())
+			return 0;
+		GeoscapeState *geo = dynamic_cast<GeoscapeState *>(topState());
+		if (!geo)
+			return 0;
+		for (DogfightState *d : geo->getDogfights())
+		{
+			if (!d->isMinimized())
+				return 0;
+		}
+		return geo;
+	}
+
 	/// The top state's text field that's taking typing, if any. The layer stands down while
 	/// there is one (spec 8), apart from echoing what the typing does.
 	TextEdit *focusedEdit()
@@ -266,7 +288,8 @@ namespace
 		size_t caret = edit->getCaretPos();
 		if (edit != _edit)
 		{
-			say(Vocab::format(Vocab::EDITING, { fieldText(edit) }), true);
+			// Queued: Enter that focused it has nothing else to say, and a screen's name may be coming first.
+			say(Vocab::format(Vocab::EDITING, { fieldText(edit) }), false);
 		}
 		else if (text != _editText)
 		{
@@ -420,6 +443,10 @@ bool handleEvent(Game *game, const SDL_Event &ev)
 		{
 			guarded("battle key", [&] { claimed = Battle::handleKey(battle, key, shift, ctrl); });
 		}
+		else if (GeoscapeState *geo = geoOnTop())
+		{
+			guarded("geo key", [&] { claimed = Geo::handleKey(geo, key, shift, ctrl); });
+		}
 	}
 	if (claimed)
 		_swallowed.insert(key);
@@ -433,12 +460,15 @@ void update(Game *game)
 	// Reading it now would announce half-built screens.
 	if (!game->isStateInitialized())
 		return;
-	guarded("edit echo", [] { watchEdit(); });
 	sync();
+	// After sync, so a screen that opens with its field focused says its name first.
+	guarded("edit echo", [] { watchEdit(); });
 	if (!_screen)
 	{
 		if (BattlescapeState *battle = battleOnTop())
 			guarded("battle update", [&] { Battle::update(battle); });
+		else if (GeoscapeState *geo = geoOnTop())
+			guarded("geo update", [&] { Geo::update(geo); });
 		return;
 	}
 	if (_screen->tick)

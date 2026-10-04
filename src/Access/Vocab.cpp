@@ -171,6 +171,19 @@ namespace
 		"Editing {0}. Type, then Enter to finish. Ctrl+L reads the field",
 		"blank",
 		"space",
+		"UFOs",
+		"alien sites",
+		"alien bases",
+		"craft in flight",
+		"bases",
+		"waypoints",
+		"{0} nautical miles {1}",
+		"{0}, {1}, funds {2}, speed {3}",
+		"speed {0}",
+		"Nothing picked. Period and Comma step through what's on the globe, Shift changes category",
+		"{0}, a base costs {1}",
+		"No new research topics.",
+		"Accessibility error on {0}, in {1}: {2}. Details in openxcom.log",
 	};
 }
 

@@ -32,6 +32,7 @@
 #include "../Interface/TextEdit.h"
 #include "../Interface/TextList.h"
 #include "../Interface/TextButton.h"
+#include "../Interface/ToggleTextButton.h"
 #include "../Menu/MainMenuState.h"
 #include "../Menu/NewBattleState.h"
 #include "../Menu/PauseState.h"
@@ -41,6 +42,36 @@
 #include "../Menu/DeleteGameState.h"
 #include "../Menu/ConfirmLoadState.h"
 #include "../Menu/ErrorMessageState.h"
+#include "../Menu/NewGameState.h"
+#include "../Geoscape/AlienBaseState.h"
+#include "../Geoscape/BaseNameState.h"
+#include "../Geoscape/BuildNewBaseState.h"
+#include "../Geoscape/ConfirmDestinationState.h"
+#include "../Geoscape/ConfirmNewBaseState.h"
+#include "../Geoscape/CraftErrorState.h"
+#include "../Geoscape/CraftPatrolState.h"
+#include "../Geoscape/GeoscapeCraftState.h"
+#include "../Geoscape/Globe.h"
+#include "../Geoscape/ItemsArrivingState.h"
+#include "../Geoscape/LowFuelState.h"
+#include "../Geoscape/MissionDetectedState.h"
+#include "../Geoscape/MultipleTargetsState.h"
+#include "../Geoscape/NewPossibleManufactureState.h"
+#include "../Geoscape/NewPossibleResearchState.h"
+#include "../Geoscape/ProductionCompleteState.h"
+#include "../Geoscape/ResearchCompleteState.h"
+#include "../Geoscape/ResearchRequiredState.h"
+#include "../Geoscape/TargetInfoState.h"
+#include "../Geoscape/UfoDetectedState.h"
+#include "../Geoscape/UfoLostState.h"
+#include "../Ufopaedia/UfopaediaStartState.h"
+#include "../Ufopaedia/UfopaediaSelectState.h"
+#include "../Mod/City.h"
+#include "../Mod/RuleRegion.h"
+#include "../Savegame/Region.h"
+#include "../Engine/Unicode.h"
+#include "../fmath.h"
+#include "Geo.h"
 #include "../Battlescape/AbortMissionState.h"
 #include "../Basescape/CraftArmorState.h"
 #include "../Basescape/CraftEquipmentState.h"
@@ -287,10 +318,61 @@ AccessScreen simpleScreen(const std::string &key, std::function<bool(State *)> i
 	return s;
 }
 
+/// allText, then every row of the visible lists: popups whose facts sit in a list (a UFO's size and speed).
+std::string allTextWithLists(State *state)
+{
+	std::string result = allText(state);
+	for (Surface *s : state->getSurfaces())
+	{
+		TextList *list = dynamic_cast<TextList *>(s);
+		if (!list || !list->getVisible())
+			continue;
+		for (size_t row = 0; row < list->getTexts(); ++row)
+		{
+			std::string line = Controls::rowText(list, row);
+			if (line.empty())
+				continue;
+			if (!result.empty())
+				result += " ";
+			result += line + ".";
+		}
+	}
+	return result;
+}
+
+/// A popup: says all its text and its lists on arrival, then lists its widgets.
+AccessScreen popupScreen(const std::string &key, std::function<bool(State *)> isActive)
+{
+	AccessScreen s = simpleScreen(key, isActive);
+	s.name = allTextWithLists;
+	return s;
+}
+
 template <typename T>
 bool is(State *state)
 {
 	return dynamic_cast<T *>(state) != nullptr;
+}
+
+/// New game: says only the title on arrival; the Ironman description is the Ironman button's tooltip (Space).
+AccessScreen newGame()
+{
+	AccessScreen s;
+	s.key = "newGame";
+	s.isActive = is<NewGameState>;
+	s.name = firstText;
+	s.build = [](GraphBuilder &b, State *state)
+	{
+		addWidgets(b, state, [state](Surface *surface, size_t, NodeVtable &v)
+		{
+			if (dynamic_cast<ToggleTextButton *>(surface))
+			{
+				std::string description = state->tr("STR_IRONMAN_DESC");
+				v.OnTooltip = [description] { Speech::say(description, true); };
+			}
+		});
+	};
+	return s;
 }
 
 AccessScreen mainMenu()
@@ -935,6 +1017,93 @@ AccessScreen debriefing()
 
 }
 
+/// Finds land at or near a point. Coastal cities can sit just off the game's land polygons,
+/// and a base can only go on land. Searches rings a quarter degree apart, out to two degrees.
+bool landNear(Globe *globe, double &lon, double &lat)
+{
+	if (globe->insideLand(lon, lat))
+		return true;
+	const double step = 0.25 * M_PI / 180.0;
+	for (int ring = 1; ring <= 8; ++ring)
+	{
+		for (int dir = 0; dir < 8; ++dir)
+		{
+			double a = dir * M_PI / 4;
+			double tryLon = lon + ring * step * sin(a), tryLat = lat - ring * step * cos(a);
+			while (tryLon < 0)
+				tryLon += 2 * M_PI;
+			while (tryLon >= 2 * M_PI)
+				tryLon -= 2 * M_PI;
+			if (globe->insideLand(tryLon, tryLat))
+			{
+				lon = tryLon;
+				lat = tryLat;
+				return true;
+			}
+		}
+	}
+	return false;
+}
+
+/// Picking where a new base goes: the game's cities grouped by region (with the base cost,
+/// after the first base), each with its country. Enter centres the globe on the city and
+/// clicks the globe, so the game's own handler places the base and runs its checks.
+AccessScreen buildNewBase()
+{
+	AccessScreen s;
+	s.key = "buildNewBase";
+	s.isActive = is<BuildNewBaseState>;
+	s.name = allText;
+	s.build = [](GraphBuilder &b, State *state)
+	{
+		BuildNewBaseState *build = static_cast<BuildNewBaseState *>(state);
+		Game *game = State::getGamePtr();
+		for (Region *region : *game->getSavedGame()->getRegions())
+		{
+			RuleRegion *rules = region->getRules();
+			if (rules->getCities()->empty())
+				continue;
+			std::string name = state->tr(rules->getType());
+			b.PushContext(build->isFirst() ? name : Vocab::format(Vocab::REGION_BASE_COST, { name, Unicode::formatFunding(rules->getBaseCost()) }));
+			for (size_t i = 0; i < rules->getCities()->size(); ++i)
+			{
+				City *city = rules->getCities()->at(i);
+				NodeVtable v;
+				std::string label = city->getName(game->getLanguage());
+				std::string country = Geo::placeName(city->getLongitude(), city->getLatitude());
+				if (!country.empty() && country != label)
+					label += ", " + country;
+				v.Announcements.push_back(NodeAnnouncement([label] { return label; }, false, AnnouncementKinds::Label));
+				v.OnActivate = [build, city]
+				{
+					double lon = city->getLongitude(), lat = city->getLatitude();
+					// No land nearby: click the city itself and let the game say it can't build there.
+					landNear(build->getGlobe(), lon, lat);
+					build->getGlobe()->center(lon, lat);
+					Controls::click(build, build->getGlobe());
+				};
+				b.AddItem(ControlId::Referenced(city, "city:" + rules->getType() + ":" + std::to_string(i)), v);
+			}
+			b.PopContext();
+		}
+		// Cancel, when it's there (not for the first base).
+		addWidgets(b, state);
+	};
+	return s;
+}
+
+AccessScreen newPossibleResearch()
+{
+	AccessScreen s = popupScreen("newPossibleResearch", is<NewPossibleResearchState>);
+	// The game shows this even when nothing is new, with no title and an empty list.
+	s.name = [](State *state)
+	{
+		std::string text = allTextWithLists(state);
+		return text.empty() ? Vocab::get(Vocab::NO_NEW_RESEARCH) : text;
+	};
+	return s;
+}
+
 const std::vector<AccessScreen> &all()
 {
 	static const std::vector<AccessScreen> screens = {
@@ -954,6 +1123,29 @@ const std::vector<AccessScreen> &all()
 		simpleScreen("deleteGame", is<DeleteGameState>),
 		simpleScreen("confirmLoad", is<ConfirmLoadState>),
 		simpleScreen("errorMessage", is<ErrorMessageState>),
+		newGame(),
+		buildNewBase(),
+		simpleScreen("baseName", is<BaseNameState>),
+		simpleScreen("confirmNewBase", is<ConfirmNewBaseState>),
+		popupScreen("ufoDetected", is<UfoDetectedState>),
+		popupScreen("ufoLost", is<UfoLostState>),
+		popupScreen("missionDetected", is<MissionDetectedState>),
+		popupScreen("alienBase", is<AlienBaseState>),
+		popupScreen("craftPatrol", is<CraftPatrolState>),
+		popupScreen("lowFuel", is<LowFuelState>),
+		popupScreen("craftError", is<CraftErrorState>),
+		popupScreen("researchComplete", is<ResearchCompleteState>),
+		popupScreen("researchRequired", is<ResearchRequiredState>),
+		newPossibleResearch(),
+		popupScreen("newPossibleManufacture", is<NewPossibleManufactureState>),
+		popupScreen("productionComplete", is<ProductionCompleteState>),
+		popupScreen("itemsArriving", is<ItemsArrivingState>),
+		popupScreen("multipleTargets", is<MultipleTargetsState>),
+		popupScreen("targetInfo", is<TargetInfoState>),
+		popupScreen("geoscapeCraft", is<GeoscapeCraftState>),
+		popupScreen("confirmDestination", is<ConfirmDestinationState>),
+		simpleScreen("ufopaediaStart", is<UfopaediaStartState>),
+		simpleScreen("ufopaediaSelect", is<UfopaediaSelectState>),
 	};
 	return screens;
 }

@@ -55,6 +55,10 @@ public:
 	~BuildNewBaseState();
 	/// Resets globe.
 	void init();
+	/// Gets the globe the base is placed on.
+	Globe *getGlobe() const { return _globe; }
+	/// Is this the first base of a new game?
+	bool isFirst() const { return _first; }
 	/// Runs the timer.
 	void think();
 	/// Handles actions.

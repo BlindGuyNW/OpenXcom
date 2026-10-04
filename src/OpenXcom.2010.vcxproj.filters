@@ -954,6 +954,9 @@
     <ClCompile Include="Access\Battle.cpp">
       <Filter>Access</Filter>
     </ClCompile>
+    <ClCompile Include="Access\Geo.cpp">
+      <Filter>Access</Filter>
+    </ClCompile>
     <ClCompile Include="Access\TerrainNames.cpp">
       <Filter>Access</Filter>
     </ClCompile>
@@ -1970,6 +1973,9 @@
       <Filter>Access</Filter>
     </ClInclude>
     <ClInclude Include="Access\Battle.h">
+      <Filter>Access</Filter>
+    </ClInclude>
+    <ClInclude Include="Access\Geo.h">
       <Filter>Access</Filter>
     </ClInclude>
     <ClInclude Include="Access\TerrainNames.h">

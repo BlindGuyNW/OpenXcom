@@ -89,6 +89,10 @@ public:
 	void popup(State *state);
 	/// Gets the Geoscape globe.
 	Globe *getGlobe() const;
+	/// Gets the pressed time speed button.
+	TextButton *getTimeSpeed() const { return _timeSpeed; }
+	/// Gets the running dogfights.
+	const std::list<DogfightState*> &getDogfights() const { return _dogfights; }
 	/// Handler for clicking the globe.
 	void globeClick(Action *action);
 	/// Handler for clicking the Intercept button.
