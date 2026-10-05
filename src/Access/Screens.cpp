@@ -83,6 +83,7 @@
 #include "Geo.h"
 #include "Dogfight.h"
 #include "../Battlescape/AliensCrashState.h"
+#include "../Geoscape/BaseDefenseState.h"
 #include "../Geoscape/BaseDestroyedState.h"
 #include "../Geoscape/ConfirmCydoniaState.h"
 #include "../Geoscape/ConfirmLandingState.h"
@@ -91,6 +92,7 @@
 #include "../Geoscape/SelectDestinationState.h"
 #include "../Savegame/Base.h"
 #include "../Savegame/Craft.h"
+#include "../Savegame/Soldier.h"
 #include "../Savegame/Waypoint.h"
 #include "../Engine/Options.h"
 #include "../Battlescape/AbortMissionState.h"
@@ -150,6 +152,7 @@
 #include "../Mod/RuleInventory.h"
 #include "../Savegame/SavedGame.h"
 #include "../Savegame/Tile.h"
+#include "Navigator.h"
 #include "Speech.h"
 #include "../Battlescape/NextTurnState.h"
 #include "../Engine/InteractiveSurface.h"
@@ -1762,6 +1765,127 @@ AccessScreen crafts()
 	return s;
 }
 
+/// What a crew row's Enter did: on or off the craft, or why the game refused (it does so silently).
+std::string crewChange(Craft *c, Soldier *s, Craft *before)
+{
+	Language *lang = State::getGamePtr()->getLanguage();
+	Craft *after = s->getCraft();
+	if (after == c && before != c)
+		return Vocab::format(Vocab::CREW_ADDED, { c->getName(lang), std::to_string(c->getSpaceAvailable()) });
+	if (before == c && after != c)
+		return Vocab::format(Vocab::CREW_REMOVED, { std::to_string(c->getSpaceAvailable()) });
+	if (before && before->getStatus() == "STR_OUT")
+		return Vocab::format(Vocab::CREW_CRAFT_OUT, { before->getName(lang) });
+	if (s->getWoundRecovery() > 0)
+		return Vocab::format(Vocab::CREW_WOUNDED, { std::to_string(s->getWoundRecovery()) });
+	return Vocab::format(Vocab::CREW_FULL, { c->getName(lang) });
+}
+
+/// Picking a craft's crew: rows as the game shows them (name, rank, craft). Enter puts a soldier
+/// on or off the craft through the game's own click, then says what happened or why it refused.
+AccessScreen craftSoldiers()
+{
+	AccessScreen s = simpleScreen("craftSoldiers", is<CraftSoldiersState>);
+	s.build = [](GraphBuilder &b, State *state)
+	{
+		CraftSoldiersState *cs = static_cast<CraftSoldiersState *>(state);
+		Base *base = cs->getBase();
+		Craft *c = base->getCrafts()->at(cs->getCraftIndex());
+		// Outlives the rebuild between Enter and the state line.
+		static std::string result;
+		addWidgets(b, state, [state, base, c](Surface *surface, size_t row, NodeVtable &v)
+		{
+			TextList *list = dynamic_cast<TextList *>(surface);
+			if (!list || row == NO_ROW || row >= base->getSoldiers()->size())
+				return;
+			v.OnActivate = [state, list, row, base, c]
+			{
+				Soldier *soldier = base->getSoldiers()->at(row);
+				Craft *before = soldier->getCraft();
+				Controls::clickRow(state, list, row);
+				result = crewChange(c, soldier, before);
+			};
+			v.StateText = [] { return result; };
+		});
+	};
+	return s;
+}
+
+/// A cell with only spaces in it (the game pads unused base defense cells with " ").
+bool blankCell(const std::string &cell)
+{
+	return cell.find_first_not_of(' ') == std::string::npos;
+}
+
+std::string defenseCell(TextList *list, size_t row, size_t column)
+{
+	return column < list->getCellCount(row) ? list->getCellText(row, column) : std::string();
+}
+
+/// A base defense row: "Missile Defenses, HIT", or a message ("Grav shield repels UFO").
+std::string defenseRow(TextList *list, size_t row)
+{
+	std::string name = defenseCell(list, row, 0), firing = defenseCell(list, row, 1), result = defenseCell(list, row, 2);
+	if (!blankCell(result))
+		return Vocab::format(Vocab::DEFENSE_SHOT, { name, result });
+	if (!blankCell(firing))
+		return Vocab::format(Vocab::DEFENSE_SHOT, { name, firing });
+	return name;
+}
+
+/// A row is finished once its shot has a result, it's one of the two messages, or a later row exists.
+bool defenseRowDone(State *state, TextList *list, size_t row)
+{
+	std::string name = defenseCell(list, row, 0);
+	return row + 1 < list->getTexts() || !blankCell(defenseCell(list, row, 2))
+		|| name == std::string(state->tr("STR_GRAV_SHIELD_REPELS_UFO")) || name == std::string(state->tr("STR_UFO_DESTROYED"));
+}
+
+/// A UFO attacking a base with defenses: the title on arrival, then each defense's shot (queued)
+/// as it resolves, from the game's own list. OK only exists once the attack is over; focus moves there.
+AccessScreen baseDefense()
+{
+	AccessScreen s;
+	s.key = "baseDefense";
+	s.isActive = is<BaseDefenseState>;
+	s.name = firstText;
+	s.build = [](GraphBuilder &b, State *state)
+	{
+		BaseDefenseState *bd = static_cast<BaseDefenseState *>(state);
+		Text *init = bd->getInitText();
+		TextList *list = bd->getList();
+		addLine(b, ControlId::Referenced(init, "init"), [init] { return init->getText(); });
+		for (size_t row = 0; row < list->getTexts(); ++row)
+			addLine(b, ControlId::Referenced(list, "row:" + std::to_string(row)), [list, row] { return defenseRow(list, row); });
+		TextButton *ok = bd->getOkButton();
+		if (ok->getVisible())
+			b.AddItem(ControlId::Referenced(ok, "ok"), Controls::textButton(state, ok));
+	};
+	s.tick = [](State *state)
+	{
+		static State *watched = 0;
+		static size_t said = 0;
+		static bool okFocused = false;
+		if (state != watched)
+		{
+			watched = state;
+			said = 0;
+			okFocused = false;
+		}
+		BaseDefenseState *bd = static_cast<BaseDefenseState *>(state);
+		TextList *list = bd->getList();
+		for (; said < list->getTexts() && defenseRowDone(state, list, said); ++said)
+			Speech::say(defenseRow(list, said), false);
+		TextButton *ok = bd->getOkButton();
+		if (ok->getVisible() && !okFocused)
+		{
+			okFocused = true;
+			Navigator::focus(state, ControlId::Referenced(ok, "ok"));
+		}
+	};
+	return s;
+}
+
 /// Craft info, wired explicitly: the weapons, crew and equipment are only pictures on screen.
 /// Arrival says the craft, its status, damage and fuel (the game's lines, with repair and refuel times).
 AccessScreen craftInfo()
@@ -2096,7 +2220,8 @@ const std::vector<AccessScreen> &all()
 		mainMenu(), newBattle(), briefing(), inventory(), nextTurn(),
 		craftInfo(),
 		craftWeapons(),
-		simpleScreen("craftSoldiers", is<CraftSoldiersState>),
+		craftSoldiers(),
+		baseDefense(),
 		craftEquipment(),
 		simpleScreen("craftArmor", is<CraftArmorState>),
 		simpleScreen("soldierArmor", is<SoldierArmorState>),

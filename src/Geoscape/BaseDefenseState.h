@@ -60,6 +60,12 @@ public:
 	void nextStep();
 	/// Handler for clicking the OK button.
 	void btnOkClick(Action *action);
+	/// Gets the defenses list (accessibility layer).
+	TextList *getList() const { return _lstDefenses; }
+	/// Gets the OK button, hidden until the attack is over (accessibility layer).
+	TextButton *getOkButton() const { return _btnOk; }
+	/// Gets the "defenses initiated" line (accessibility layer).
+	Text *getInitText() const { return _txtInit; }
 };
 
 }

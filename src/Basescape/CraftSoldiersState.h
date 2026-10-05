@@ -76,6 +76,10 @@ public:
 	void lstSoldiersClick(Action *action);
 	/// Handler for pressing-down a mouse-button in the list.
 	void lstSoldiersMousePress(Action *action);
+	/// Gets the base (accessibility layer).
+	Base *getBase() const { return _base; }
+	/// Gets the craft's index in the base (accessibility layer).
+	size_t getCraftIndex() const { return _craft; }
 };
 
 }

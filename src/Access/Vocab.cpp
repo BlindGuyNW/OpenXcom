@@ -240,6 +240,12 @@ namespace
 		"{0}, under construction, {1} days",
 		"base grid",
 		"{0}, {1} in stores, ammunition {2}",
+		"on {0}, spaces free: {1}",
+		"removed, spaces free: {0}",
+		"can't change, {0} is out",
+		"can't add, wounded, {0} days to recover",
+		"can't add, {0} is full",
+		"{0}, {1}",
 	};
 }
 
