@@ -18,6 +18,7 @@
  */
 #include "Battle.h"
 #include <algorithm>
+#include <climits>
 #include <cmath>
 #include <cstdlib>
 #include <map>
@@ -42,6 +43,7 @@
 #include "../Interface/Cursor.h"
 #include "../Mod/MapData.h"
 #include "../Mod/RuleItem.h"
+#include "../Mod/Armor.h"
 #include "../Mod/Unit.h"
 #include "../Savegame/BattleItem.h"
 #include "../Savegame/BattleUnit.h"
@@ -934,6 +936,47 @@ namespace
 		say(joinComma({ e.name, offsetText(anchor(), e.pos) }), false);
 	}
 
+	/// Which of a unit's tiles to put the cursor on. A large unit (2 by 2) is anchored on its north-west
+	/// tile, which may be the one behind cover: while aiming, prefer a tile the shooter has a line of
+	/// fire to (the game's own test, TileEngine::canTargetUnit), then the one nearest the selected soldier.
+	Position unitTile(BattlescapeState *state, BattleUnit *unit)
+	{
+		Position anchorPos = unit->getPosition();
+		int size = unit->getArmor()->getSize();
+		if (size <= 1)
+			return anchorPos;
+		SavedBattleGame *save = saveOf(state);
+		BattleAction *action = state->getBattleGame()->getCurrentAction();
+		BattleUnit *shooter = action->targeting ? action->actor : 0;
+		Position origin;
+		if (shooter)
+			origin = save->getTileEngine()->getOriginVoxel(*action, save->getTile(shooter->getPosition()));
+		Position from = anchor();
+		Position best = anchorPos;
+		int bestScore = INT_MAX;
+		for (int x = 0; x < size; ++x)
+		{
+			for (int y = 0; y < size; ++y)
+			{
+				Position p = anchorPos + Position(x, y, 0);
+				Tile *tile = save->getTile(p);
+				if (!tile)
+					continue;
+				int dx = p.x - from.x, dy = p.y - from.y;
+				int score = dx * dx + dy * dy;
+				Position scanVoxel;
+				if (shooter && !save->getTileEngine()->canTargetUnit(&origin, tile, &scanVoxel, shooter, false))
+					score += 1000000;
+				if (score < bestScore)
+				{
+					bestScore = score;
+					best = p;
+				}
+			}
+		}
+		return best;
+	}
+
 	/// Moves the cursor onto the current entry, if it's still there.
 	void scanJump(BattlescapeState *state)
 	{
@@ -941,7 +984,8 @@ namespace
 		{
 			if (e.same(_scanCurrent))
 			{
-				moveCursor(state, e.pos, e.pos.z != _cursor.z);
+				Position p = e.unit ? unitTile(state, e.unit) : e.pos;
+				moveCursor(state, p, p.z != _cursor.z);
 				return;
 			}
 		}
@@ -988,7 +1032,12 @@ namespace
 		BattleUnit *there = tile ? tile->getUnit() : 0;
 		if (unitShown(there) && there->getFaction() == FACTION_HOSTILE)
 		{
-			say(joinComma({ describeTile(state, _cursor, false), targetText(state, _cursor) }), false);
+			// A large one may be better hit through another of its tiles.
+			Position p = unitTile(state, there);
+			if (p != _cursor)
+				moveCursor(state, p, false, false);
+			else
+				say(joinComma({ describeTile(state, _cursor, false), targetText(state, _cursor) }), false);
 			return;
 		}
 		// Nearest enemy the soldier can see, else the nearest one shown at all.
@@ -1005,7 +1054,8 @@ namespace
 				break;
 			}
 		}
-		moveCursor(state, pick->unit->getPosition(), pick->unit->getPosition().z != _cursor.z, false);
+		Position p = unitTile(state, pick->unit);
+		moveCursor(state, p, p.z != _cursor.z, false);
 	}
 
 	/// Rough compass direction from one tile to another, plus above/below: "northeast, above".
