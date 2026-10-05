@@ -205,18 +205,30 @@ void BaseView::setSelectable(int size)
  */
 bool BaseView::isPlaceable(RuleBaseFacility *rule) const
 {
+	return checkPlacement(rule, _gridX, _gridY) == PLACE_OK;
+}
+
+/**
+ * Checks if a facility can be placed with its top left corner on a square, and why not (accessibility).
+ * @param rule Facility type.
+ * @param gx Square column.
+ * @param gy Square row.
+ * @return PLACE_OK, or the reason it can't go there.
+ */
+int BaseView::checkPlacement(RuleBaseFacility *rule, int gx, int gy) const
+{
 	// Check if square isn't occupied
-	for (int y = _gridY; y < _gridY + rule->getSize(); ++y)
+	for (int y = gy; y < gy + rule->getSize(); ++y)
 	{
-		for (int x = _gridX; x < _gridX + rule->getSize(); ++x)
+		for (int x = gx; x < gx + rule->getSize(); ++x)
 		{
 			if (x < 0 || x >= BASE_SIZE || y < 0 || y >= BASE_SIZE)
 			{
-				return false;
+				return PLACE_OFF_GRID;
 			}
 			if (_facilities[x][y] != 0)
 			{
-				return false;
+				return PLACE_OCCUPIED;
 			}
 		}
 	}
@@ -226,16 +238,16 @@ bool BaseView::isPlaceable(RuleBaseFacility *rule) const
 	// Check for another facility to connect to
 	for (int i = 0; i < rule->getSize(); ++i)
 	{
-		if ((_gridX > 0 && _facilities[_gridX - 1][_gridY + i] != 0 && (bq || _facilities[_gridX - 1][_gridY + i]->getBuildTime() == 0)) ||
-			(_gridY > 0 && _facilities[_gridX + i][_gridY - 1] != 0 && (bq || _facilities[_gridX + i][_gridY - 1]->getBuildTime() == 0)) ||
-			(_gridX + rule->getSize() < BASE_SIZE && _facilities[_gridX + rule->getSize()][_gridY + i] != 0 && (bq || _facilities[_gridX + rule->getSize()][_gridY + i]->getBuildTime() == 0)) ||
-			(_gridY + rule->getSize() < BASE_SIZE && _facilities[_gridX + i][_gridY + rule->getSize()] != 0 && (bq || _facilities[_gridX + i][_gridY + rule->getSize()]->getBuildTime() == 0)))
+		if ((gx > 0 && _facilities[gx - 1][gy + i] != 0 && (bq || _facilities[gx - 1][gy + i]->getBuildTime() == 0)) ||
+			(gy > 0 && _facilities[gx + i][gy - 1] != 0 && (bq || _facilities[gx + i][gy - 1]->getBuildTime() == 0)) ||
+			(gx + rule->getSize() < BASE_SIZE && _facilities[gx + rule->getSize()][gy + i] != 0 && (bq || _facilities[gx + rule->getSize()][gy + i]->getBuildTime() == 0)) ||
+			(gy + rule->getSize() < BASE_SIZE && _facilities[gx + i][gy + rule->getSize()] != 0 && (bq || _facilities[gx + i][gy + rule->getSize()]->getBuildTime() == 0)))
 		{
-			return true;
+			return PLACE_OK;
 		}
 	}
 
-	return false;
+	return PLACE_UNCONNECTED;
 }
 
 /**

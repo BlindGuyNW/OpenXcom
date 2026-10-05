@@ -93,6 +93,8 @@ public:
 	Base *getBase() const { return _base; }
 	/// Gets the hover tooltip naming the facility under the mouse (accessibility).
 	Text *getFacilityText() const { return _txtFacility; }
+	/// Gets the facility grid (accessibility).
+	BaseView *getView() const { return _view; }
 	/// Shows another base, as its hotkey does (for the accessibility layer).
 	void selectBase(Base *base) { _base = base; init(); }
 };

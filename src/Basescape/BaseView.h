@@ -80,6 +80,10 @@ public:
 	BaseFacility *getFacilityAt(int x, int y) const;
 	/// Checks if a facility can be placed.
 	bool isPlaceable(RuleBaseFacility *rule) const;
+	/// What checkPlacement finds (accessibility).
+	enum { PLACE_OK, PLACE_OFF_GRID, PLACE_OCCUPIED, PLACE_UNCONNECTED };
+	/// Checks if a facility can be placed with its top left corner on a square, and why not (accessibility).
+	int checkPlacement(RuleBaseFacility *rule, int gx, int gy) const;
 	/// Checks if the placed facility is placed in queue or not.
 	bool isQueuedBuilding(RuleBaseFacility *rule) const;
 	/// ReCalculates the remaining build-time of all queued buildings.

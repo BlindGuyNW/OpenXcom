@@ -60,6 +60,8 @@ public:
 	void cbxCategoryChange (Action * action);
 	/// Fills the list of possible productions.
 	void fillProductionList();
+	/// Gets the category filter (for the accessibility layer).
+	ComboBox *getCategory() const { return _cbxCategory; }
 };
 
 }

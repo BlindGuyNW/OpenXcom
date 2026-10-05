@@ -54,6 +54,10 @@ public:
 	void btnNewProductionClick(Action * action);
 	/// Fills the list of base productions.
 	void fillProductionList();
+	/// Gets the base (for the accessibility layer).
+	Base *getBase() const { return _base; }
+	/// Gets the engineers, workshop space and funds lines (accessibility).
+	std::vector<Text *> getInfoTexts() const { return { _txtAvailable, _txtAllocated, _txtSpace, _txtFunds }; }
 };
 
 }

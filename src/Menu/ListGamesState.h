@@ -75,6 +75,11 @@ public:
 	void sortDateClick(Action *action);
 	/// disables the sort buttons.
 	void disableSort();
+	/// Gets the Name and Date sort arrows; the inactive one has no shape (for the accessibility layer).
+	ArrowButton *getSortNameButton() const { return _sortName; }
+	ArrowButton *getSortDateButton() const { return _sortDate; }
+	/// Can the list be sorted now? Not while a save is being named (accessibility).
+	bool isSortable() const { return _sortable; }
 };
 
 }

@@ -39,6 +39,7 @@
 #include "../Menu/AbandonGameState.h"
 #include "../Menu/ListLoadState.h"
 #include "../Menu/ListSaveState.h"
+#include "../Menu/ListGamesState.h"
 #include "../Menu/DeleteGameState.h"
 #include "../Menu/ConfirmLoadState.h"
 #include "../Menu/ErrorMessageState.h"
@@ -114,6 +115,18 @@
 #include "../Basescape/TransferItemsState.h"
 #include "../Basescape/ManageAlienContainmentState.h"
 #include "../Basescape/PlaceLiftState.h"
+#include "../Basescape/BuildFacilitiesState.h"
+#include "../Basescape/PlaceFacilityState.h"
+#include "../Basescape/DismantleFacilityState.h"
+#include "../Basescape/ManufactureState.h"
+#include "../Basescape/NewManufactureListState.h"
+#include "../Basescape/ManufactureStartState.h"
+#include "../Basescape/ManufactureInfoState.h"
+#include "../Basescape/SackSoldierState.h"
+#include "../Basescape/SoldierMemorialState.h"
+#include "../Savegame/Production.h"
+#include "../Savegame/ItemContainer.h"
+#include "../Mod/RuleManufacture.h"
 #include "../Basescape/BaseView.h"
 #include "../Savegame/BaseFacility.h"
 #include "../Mod/RuleBaseFacility.h"
@@ -417,6 +430,9 @@ bool isListedWidget(Surface *s)
 /// Adds every visible button, arrow button, text field, combo box, slider and list of a state as a vertical list in reading order:
 /// top to bottom, with each frame's controls together under the frame's heading.
 /// A list's rows sit together at the list's position, under a "list" heading.
+/// Tab-stops: each list and each frame is a stop of its own, and the loose widgets between them share one,
+/// so Tab skips a long list or a group of settings. Leading loose widgets stay in the recipe's current stop,
+/// and anything the recipe adds after a list or frame starts a fresh stop.
 /// Keys are the widgets' indices among the state's elements, which only change if the state's code does.
 void addWidgets(GraphBuilder &b, State *state, const Customizer &customize)
 {
@@ -443,8 +459,16 @@ void addWidgets(GraphBuilder &b, State *state, const Customizer &customize)
 	std::stable_sort(widgets.begin(), widgets.end(), [](const Widget &a, const Widget &b) { return a.order() < b.order(); });
 
 	Frame *context = 0;
+	// The list or frame whose stop is being filled; null for loose widgets.
+	const Surface *group = 0;
+	bool first = true;
 	for (const Widget &w : widgets)
 	{
+		const Surface *g = dynamic_cast<TextList *>(w.surface) ? w.surface : (const Surface *)w.frame;
+		if (first ? g != 0 : g != group)
+			b.BeginStop("widgets:" + std::to_string(w.index));
+		group = g;
+		first = false;
 		if (w.frame != context)
 		{
 			if (context)
@@ -469,7 +493,9 @@ void addWidgets(GraphBuilder &b, State *state, const Customizer &customize)
 		{
 			if (customize)
 				customize(w.surface, NO_ROW, v);
-			b.AddItem(id, v);
+			// A customizer clears the announcements to leave a widget out (the recipe wires it itself).
+			if (!v.Announcements.empty())
+				b.AddItem(id, v);
 		}
 		else if (TextList *list = dynamic_cast<TextList *>(w.surface))
 		{
@@ -494,6 +520,8 @@ void addWidgets(GraphBuilder &b, State *state, const Customizer &customize)
 	}
 	if (context)
 		b.PopContext();
+	if (group)
+		b.BeginStop("widgets:end");
 }
 
 void addWidgets(GraphBuilder &b, State *state)
@@ -509,6 +537,50 @@ AccessScreen simpleScreen(const std::string &key, std::function<bool(State *)> i
 	s.isActive = isActive;
 	s.name = allText;
 	s.build = [](GraphBuilder &b, State *state) { addWidgets(b, state); };
+	return s;
+}
+
+/// The save list's order: "A to Z", "newest first".
+std::string saveOrderText()
+{
+	switch (Options::saveOrder)
+	{
+	case SORT_NAME_ASC: return Vocab::get(Vocab::SAVES_A_TO_Z);
+	case SORT_NAME_DESC: return Vocab::get(Vocab::SAVES_Z_TO_A);
+	case SORT_DATE_ASC: return Vocab::get(Vocab::SAVES_OLDEST_FIRST);
+	default: return Vocab::get(Vocab::SAVES_NEWEST_FIRST);
+	}
+}
+
+/// The load and save lists: "sort by name" and "sort by date" first, the active one saying the order
+/// (Enter sorts by it, again to reverse), then the saves and the buttons. The game hides the inactive
+/// sort arrow by giving it no shape, so the generic lister can't be trusted with them.
+AccessScreen listGames(const std::string &key, std::function<bool(State *)> isActive)
+{
+	AccessScreen s = simpleScreen(key, isActive);
+	s.build = [](GraphBuilder &b, State *state)
+	{
+		ListGamesState *lg = static_cast<ListGamesState *>(state);
+		ArrowButton *byName = lg->getSortNameButton(), *byDate = lg->getSortDateButton();
+		if (lg->isSortable())
+		{
+			std::pair<ArrowButton *, const char *> sorts[] = { { byName, "STR_NAME" }, { byDate, "STR_DATE" } };
+			for (const std::pair<ArrowButton *, const char *> &sort : sorts)
+			{
+				ArrowButton *btn = sort.first;
+				NodeVtable v = Controls::labelledButton(state, btn, Vocab::format(Vocab::SAVES_SORT_BY, { std::string(state->tr(sort.second)) }));
+				std::function<std::string()> order = [btn] { return btn->getShape() != ARROW_NONE ? saveOrderText() : std::string(); };
+				v.Announcements.push_back(NodeAnnouncement(order, false, "pressed"));
+				v.StateText = order;
+				b.AddItem(ControlId::Referenced(btn, std::string("sort:") + sort.second), v);
+			}
+		}
+		addWidgets(b, state, [byName, byDate](Surface *surface, size_t, NodeVtable &v)
+		{
+			if (surface == byName || surface == byDate)
+				v.Announcements.clear();
+		});
+	};
 	return s;
 }
 
@@ -1041,6 +1113,7 @@ AccessScreen medikit()
 			b.AddItem(ControlId::Referenced(view, "part:" + std::to_string(i)), v);
 		}
 		BattleItem *item = m->getItem();
+		b.BeginStop("treatments");
 		b.AddItem(ControlId::Referenced(m->getHealButton(), "heal"), medikitButton(state, m->getHealButton(), state->tr("STR_HEAL"),
 			[state, view, item, cost]
 			{
@@ -1319,13 +1392,26 @@ std::string baseSquareText(State *state, BaseView *view, int x, int y)
 		content = state->tr(fac->getRules()->getType());
 		if (fac->getBuildTime() > 0)
 			content = Vocab::format(Vocab::UNDER_CONSTRUCTION, { content, std::to_string(fac->getBuildTime()) });
+		// The hangar's craft, as the Basescape's hover text names it (assigned when the view draws).
+		else if (fac->getRules()->getCrafts() > 0 && fac->getCraft())
+			content += ", " + std::string(state->tr("STR_CRAFT_").arg(fac->getCraft()->getName(State::getGamePtr()->getLanguage())));
 	}
 	return Vocab::format(Vocab::GRID_SQUARE, { content, std::to_string(y + 1), std::to_string(x + 1) });
 }
 
+/// What a grid screen adds to the shared grid: more to say about a square, what Enter does there
+/// (by default select it and click the view), and Backspace (by default nothing).
+struct GridHooks
+{
+	std::function<std::string(int x, int y)> extra;
+	std::function<void(int x, int y)> activate;
+	std::function<void(int x, int y)> secondary;
+	std::string tooltip;
+};
+
 /// The base's 6 by 6 grid as rows of squares: arrows move in two dimensions, Enter clicks the square
 /// as the mouse would, after selecting it the way hovering does (which also moves the selector box).
-void addBaseGrid(GraphBuilder &b, State *state, BaseView *view)
+void addBaseGrid(GraphBuilder &b, State *state, BaseView *view, const GridHooks &hooks = GridHooks())
 {
 	const int size = 6;
 	b.PushContext(Vocab::get(Vocab::BASE_GRID));
@@ -1335,12 +1421,36 @@ void addBaseGrid(GraphBuilder &b, State *state, BaseView *view)
 		for (int x = 0; x < size; ++x)
 		{
 			NodeVtable v;
-			v.Announcements.push_back(NodeAnnouncement([state, view, x, y] { return baseSquareText(state, view, x, y); }, false, AnnouncementKinds::Label));
-			v.OnActivate = [state, view, x, y]
+			v.Announcements.push_back(NodeAnnouncement([state, view, hooks, x, y]
 			{
-				view->selectSquare(x, y);
-				Controls::click(state, view);
-			};
+				std::string text = baseSquareText(state, view, x, y);
+				if (hooks.extra)
+				{
+					std::string more = hooks.extra(x, y);
+					if (!more.empty())
+						text += ", " + more;
+				}
+				return text;
+			}, false, AnnouncementKinds::Label));
+			if (hooks.activate)
+			{
+				v.OnActivate = [hooks, x, y] { hooks.activate(x, y); };
+			}
+			else
+			{
+				v.OnActivate = [state, view, x, y]
+				{
+					view->selectSquare(x, y);
+					Controls::click(state, view);
+				};
+			}
+			if (hooks.secondary)
+				v.OnSecondary = [hooks, x, y] { hooks.secondary(x, y); };
+			if (!hooks.tooltip.empty())
+			{
+				std::string tip = hooks.tooltip;
+				v.OnTooltip = [tip] { Speech::say(tip, true); };
+			}
 			b.AddItem(ControlId::Referenced(view, "square:" + std::to_string(x) + ":" + std::to_string(y)), v);
 		}
 		b.EndRow();
@@ -1356,6 +1466,289 @@ AccessScreen placeLift()
 	s.isActive = is<PlaceLiftState>;
 	s.name = firstText;
 	s.build = [](GraphBuilder &b, State *state) { addBaseGrid(b, state, static_cast<PlaceLiftState *>(state)->getView()); };
+	return s;
+}
+
+/// The facilities to build: "Living Quarters, $400,000, 16 days, $10,000 a month"; Enter picks one to place.
+AccessScreen buildFacilities()
+{
+	AccessScreen s = simpleScreen("buildFacilities", is<BuildFacilitiesState>);
+	s.name = firstText;
+	s.build = [](GraphBuilder &b, State *state)
+	{
+		BuildFacilitiesState *bf = static_cast<BuildFacilitiesState *>(state);
+		addWidgets(b, state, [state, bf](Surface *surface, size_t row, NodeVtable &v)
+		{
+			if (!dynamic_cast<TextList *>(surface) || row == NO_ROW || row >= bf->getFacilities().size())
+				return;
+			RuleBaseFacility *rule = bf->getFacilities()[row];
+			std::string text = Vocab::format(Vocab::FACILITY_ROW, { std::string(state->tr(rule->getType())),
+				Unicode::formatFunding(rule->getBuildCost()), std::to_string(rule->getBuildTime()), Unicode::formatFunding(rule->getMonthlyCost()) });
+			v.Announcements.clear();
+			v.Announcements.push_back(NodeAnnouncement([text] { return text; }, false, AnnouncementKinds::Label));
+		});
+	};
+	return s;
+}
+
+/// Placing a facility: its cost, time and upkeep on arrival (and, for a big one, that it's placed by its
+/// top left square), then the grid, each square saying whether it can go there and why not, then Cancel.
+/// Enter clicks the square, so the game's own checks run; a placement is confirmed by name.
+AccessScreen placeFacility()
+{
+	AccessScreen s;
+	s.key = "placeFacility";
+	s.isActive = is<PlaceFacilityState>;
+	s.name = [](State *state)
+	{
+		std::string text = allText(state);
+		int size = static_cast<PlaceFacilityState *>(state)->getRule()->getSize();
+		if (size > 1)
+			text += ". " + Vocab::format(Vocab::PLACE_SIZE, { std::to_string(size) });
+		return text;
+	};
+	s.build = [](GraphBuilder &b, State *state)
+	{
+		PlaceFacilityState *pf = static_cast<PlaceFacilityState *>(state);
+		BaseView *view = pf->getView();
+		RuleBaseFacility *rule = pf->getRule();
+		Base *base = pf->getBase();
+		GridHooks grid;
+		grid.extra = [view, rule](int x, int y)
+		{
+			static const Vocab::Id reasons[] = { Vocab::PLACE_OK, Vocab::PLACE_OFF_GRID, Vocab::PLACE_OCCUPIED, Vocab::PLACE_UNCONNECTED };
+			return Vocab::get(reasons[view->checkPlacement(rule, x, y)]);
+		};
+		grid.activate = [state, view, rule, base](int x, int y)
+		{
+			std::string placed = Vocab::format(Vocab::FACILITY_PLACED, { std::string(state->tr(rule->getType())), std::to_string(rule->getBuildTime()) });
+			size_t before = base->getFacilities()->size();
+			view->selectSquare(x, y);
+			Controls::click(state, view);
+			// Success pops back to the list without a word; refusals push an error message, which speaks itself.
+			if (base->getFacilities()->size() > before)
+				Speech::say(placed, true);
+		};
+		addBaseGrid(b, state, view, grid);
+		b.AddItem(ControlId::Referenced(pf->getCancelButton(), "cancel"), Controls::textButton(state, pf->getCancelButton()));
+	};
+	return s;
+}
+
+/// A production line as the Manufacture screen shows it, columns named:
+/// "Laser Rifle, 10 engineers, 2 of 5 made, selling, $8,000 each, 3 days 4 hours left".
+std::string productionRow(State *state, Production *p)
+{
+	std::string made = p->getInfiniteAmount()
+		? Vocab::format(Vocab::MAN_MADE_ENDLESS, { std::to_string(p->getAmountProduced()) })
+		: Vocab::format(Vocab::MAN_MADE, { std::to_string(p->getAmountProduced()), std::to_string(p->getAmountTotal()) });
+	if (p->getSellItems())
+		made += ", " + Vocab::get(Vocab::MAN_SELLING);
+	int engineers = p->getAssignedEngineers();
+	std::string left;
+	if (p->getInfiniteAmount())
+	{
+		left = Vocab::get(Vocab::MAN_NO_END);
+	}
+	else if (engineers > 0)
+	{
+		// The game's sum: a part of an hour's work takes the whole hour.
+		int timeLeft = p->getAmountTotal() * p->getRules()->getManufactureTime() - p->getTimeSpent();
+		int hoursLeft = (timeLeft + engineers - 1) / engineers;
+		left = Vocab::format(Vocab::MAN_TIME_LEFT, { std::to_string(hoursLeft / 24), std::to_string(hoursLeft % 24) });
+	}
+	else
+	{
+		left = Vocab::get(Vocab::MAN_IDLE);
+	}
+	return Vocab::format(Vocab::MAN_ROW, { std::string(state->tr(p->getRules()->getName())), std::to_string(engineers),
+		made, Unicode::formatFunding(p->getRules()->getManufactureCost()), left });
+}
+
+/// Current production: engineers, workshop space and funds on arrival, then the production lines
+/// (read from the base's productions, which the list shows in order; Enter opens one), New Production and OK.
+AccessScreen manufacture()
+{
+	AccessScreen s = simpleScreen("manufacture", is<ManufactureState>);
+	s.name = [](State *state)
+	{
+		return firstText(state) + ". " + visibleTexts(static_cast<ManufactureState *>(state)->getInfoTexts());
+	};
+	s.build = [](GraphBuilder &b, State *state)
+	{
+		Base *base = static_cast<ManufactureState *>(state)->getBase();
+		addWidgets(b, state, [state, base](Surface *surface, size_t row, NodeVtable &v)
+		{
+			if (!dynamic_cast<TextList *>(surface) || row == NO_ROW || row >= base->getProductions().size())
+				return;
+			Production *p = base->getProductions()[row];
+			v.Announcements.clear();
+			v.Announcements.push_back(NodeAnnouncement([state, p] { return productionRow(state, p); }, false, AnnouncementKinds::Label));
+		});
+	};
+	return s;
+}
+
+/// What can be made: the title, the category filter (labelled explicitly; the heuristic picks the title),
+/// then "Laser Pistol, Weapons" rows. Enter opens one.
+AccessScreen newManufactureList()
+{
+	AccessScreen s = simpleScreen("newManufactureList", is<NewManufactureListState>);
+	s.name = firstText;
+	s.build = [](GraphBuilder &b, State *state)
+	{
+		ComboBox *category = static_cast<NewManufactureListState *>(state)->getCategory();
+		addWidgets(b, state, [state, category](Surface *surface, size_t, NodeVtable &v)
+		{
+			if (surface == category)
+				v = Controls::comboBox(state, category, Vocab::get(Vocab::CATEGORY));
+		});
+	};
+	return s;
+}
+
+/// Why Start Production is hidden, by the game's own tests, or nothing.
+std::string manufactureRefusal(ManufactureStartState *ms)
+{
+	if (ms->getStartButton()->getVisible())
+		return std::string();
+	Game *game = State::getGamePtr();
+	Base *base = ms->getBase();
+	RuleManufacture *rule = ms->getRule();
+	std::vector<std::string> why;
+	if (!rule->haveEnoughMoneyForOneMoreUnit(game->getSavedGame()->getFunds()))
+		why.push_back(Vocab::get(Vocab::MAN_NO_MONEY));
+	if (base->getFreeWorkshops() <= 0)
+		why.push_back(Vocab::get(Vocab::MAN_NO_SPACE));
+	for (const std::pair<const std::string, int> &needed : rule->getRequiredItems())
+	{
+		int have = game->getMod()->getItem(needed.first) ? base->getStorageItems()->getItem(needed.first)
+			: game->getMod()->getCraft(needed.first) ? base->getCraftCount(needed.first) : needed.second;
+		if (have < needed.second)
+		{
+			why.push_back(Vocab::get(Vocab::MAN_NO_MATERIALS));
+			break;
+		}
+	}
+	return why.empty() ? std::string() : Vocab::format(Vocab::MAN_CANT_START, { joinParts(why) });
+}
+
+/// A table row with its columns named: "Pistol, QUANTITY: 2, SPACE USED: 1". The first cell names the row;
+/// headers are the game's string ids for the other columns, in order.
+std::string headedRow(State *state, TextList *list, size_t row, const std::vector<std::string> &headers)
+{
+	std::string s = Controls::cellText(list, row, 0);
+	for (size_t i = 0; i < headers.size() && i + 1 < list->getCellCount(row); ++i)
+		s += ", " + Vocab::format(Vocab::HEADED_CELL, { std::string(state->tr(headers[i])), Controls::cellText(list, row, i + 1) });
+	return s;
+}
+
+/// Before starting production: the item, engineer hours, cost and space, every special material
+/// ("Elerium-115, UNITS REQUIRED: 4, UNITS AVAILABLE: 10") and, if Start is missing, why. Then the
+/// materials, Cancel and Start.
+AccessScreen manufactureStart()
+{
+	static const std::vector<std::string> headers = { "STR_UNITS_REQUIRED", "STR_UNITS_AVAILABLE" };
+	AccessScreen s;
+	s.key = "manufactureStart";
+	s.isActive = is<ManufactureStartState>;
+	s.name = [](State *state)
+	{
+		ManufactureStartState *ms = static_cast<ManufactureStartState *>(state);
+		RuleManufacture *rule = ms->getRule();
+		std::string text = firstText(state) + ". " +
+			std::string(state->tr("STR_ENGINEER_HOURS_TO_PRODUCE_ONE_UNIT").arg(rule->getManufactureTime())) + ". " +
+			std::string(state->tr("STR_COST_PER_UNIT_").arg(Unicode::formatFunding(rule->getManufactureCost()))) + ". " +
+			std::string(state->tr("STR_WORK_SPACE_REQUIRED").arg(rule->getRequiredSpace())) + ".";
+		TextList *list = ms->getRequiredList();
+		if (list->getVisible() && list->getTexts() > 0)
+		{
+			text += " " + std::string(state->tr("STR_SPECIAL_MATERIALS_REQUIRED")) + ".";
+			for (size_t row = 0; row < list->getTexts(); ++row)
+				text += " " + headedRow(state, list, row, headers) + ".";
+		}
+		std::string refusal = manufactureRefusal(ms);
+		if (!refusal.empty())
+			text += " " + refusal + ".";
+		return text;
+	};
+	s.build = [](GraphBuilder &b, State *state)
+	{
+		addWidgets(b, state, [state](Surface *surface, size_t row, NodeVtable &v)
+		{
+			TextList *list = dynamic_cast<TextList *>(surface);
+			if (!list || row == NO_ROW)
+				return;
+			v.Announcements.clear();
+			v.Announcements.push_back(NodeAnnouncement([state, list, row] { return headedRow(state, list, row, headers); }, false, AnnouncementKinds::Label));
+		});
+	};
+	return s;
+}
+
+/// A production's engineers: allocated, then what's free, in the game's words.
+std::string engineersText(ManufactureInfoState *mi)
+{
+	Base *base = mi->getBase();
+	return std::string(mi->tr("STR_ENGINEERS_ALLOCATED").arg(mi->getProduction()->getAssignedEngineers())) + ", " +
+		std::string(mi->tr("STR_ENGINEERS_AVAILABLE_UC").arg(base->getAvailableEngineers())) + ", " +
+		std::string(mi->tr("STR_WORKSHOP_SPACE_AVAILABLE_UC").arg(base->getFreeWorkshops()));
+}
+
+/// "UNITS TO PRODUCE: 5", or "no limit".
+std::string unitsText(ManufactureInfoState *mi)
+{
+	Production *p = mi->getProduction();
+	return Vocab::format(Vocab::HEADED_CELL, { std::string(mi->tr("STR_UNITS_TO_PRODUCE")),
+		p->getInfiniteAmount() ? Vocab::get(Vocab::NO_LIMIT) : std::to_string(p->getAmountTotal()) });
+}
+
+/// Setting up a production: the item, engineers, units and monthly profit on arrival, then engineers
+/// and units as adjustable nodes (Left/Right one, Shift five; Ctrl+Right all engineers or no unit limit,
+/// Ctrl+Left none or the fewest, as the arrows' right clicks do), each change saying the profit,
+/// then the sell toggle, Stop Production and OK. Escape is the game's OK, which starts a new production.
+AccessScreen manufactureInfo()
+{
+	AccessScreen s;
+	s.key = "manufactureInfo";
+	s.isActive = is<ManufactureInfoState>;
+	s.name = [](State *state)
+	{
+		ManufactureInfoState *mi = static_cast<ManufactureInfoState *>(state);
+		return firstText(state) + ". " + engineersText(mi) + ". " + unitsText(mi) + ". " + mi->getProfitText()->getText();
+	};
+	s.build = [](GraphBuilder &b, State *state)
+	{
+		ManufactureInfoState *mi = static_cast<ManufactureInfoState *>(state);
+		std::function<int(int, bool)> amount = [](int sign, bool large)
+		{
+			return std::abs(sign) >= Controls::ADJUST_LIMIT ? INT_MAX : (large ? 5 : 1);
+		};
+
+		NodeVtable engineers;
+		engineers.Type = &Controls::sliderType();
+		engineers.Announcements.push_back(NodeAnnouncement([mi]
+		{
+			return std::string(mi->tr("STR_ENGINEERS_ALLOCATED").arg(mi->getProduction()->getAssignedEngineers()));
+		}, false, AnnouncementKinds::Label));
+		engineers.OnAdjust = [mi, amount](int sign, bool large) { mi->changeEngineers(sign, amount(sign, large)); };
+		engineers.StateText = [mi] { return engineersText(mi) + ". " + mi->getProfitText()->getText(); };
+		b.AddItem(ControlId::Referenced(mi->getProduction(), "engineers"), engineers);
+
+		NodeVtable units;
+		units.Type = &Controls::sliderType();
+		units.Announcements.push_back(NodeAnnouncement([mi] { return unitsText(mi); }, false, AnnouncementKinds::Label));
+		units.OnAdjust = [mi, amount](int sign, bool large) { mi->changeUnits(sign, amount(sign, large)); };
+		units.StateText = [mi] { return unitsText(mi) + ". " + mi->getProfitText()->getText(); };
+		b.AddItem(ControlId::Referenced(mi->getProduction(), "units"), units);
+
+		NodeVtable sell = Controls::textButton(state, mi->getSellButton());
+		std::function<std::string()> pressed = sell.StateText;
+		sell.StateText = [pressed, mi] { return pressed() + ". " + mi->getProfitText()->getText(); };
+		b.AddItem(ControlId::Referenced(mi->getSellButton(), "sell"), sell);
+		b.AddItem(ControlId::Referenced(mi->getStopButton(), "stop"), Controls::textButton(state, mi->getStopButton()));
+		b.AddItem(ControlId::Referenced(mi->getOkButton(), "ok"), Controls::textButton(state, mi->getOkButton()));
+	};
 	return s;
 }
 
@@ -1442,10 +1835,12 @@ AccessScreen debriefing()
 			TextList *recovery = debrief->getRecoveryList();
 			if (recovery->getTexts() > 0)
 			{
+				b.BeginStop("recovered");
 				b.PushContext(debrief->getRecoveryHeading()->getText());
 				for (size_t row = 0; row < recovery->getTexts(); ++row)
 					addLine(b, ControlId::Referenced(recovery, "recovery:" + std::to_string(row)), [recovery, row] { return debriefRow(recovery, row); });
 				b.PopContext();
+				b.BeginStop("totals");
 			}
 			TextList *total = debrief->getTotalList();
 			if (total->getTexts() > 0)
@@ -1480,6 +1875,7 @@ AccessScreen debriefing()
 				});
 			}
 		}
+		b.BeginStop("buttons");
 		b.AddItem(ControlId::Referenced(debrief->getOkButton(), "ok"), Controls::textButton(state, debrief->getOkButton()));
 		b.AddItem(ControlId::Referenced(debrief->getStatsButton(), "stats"), Controls::textButton(state, debrief->getStatsButton()));
 	};
@@ -1535,6 +1931,7 @@ AccessScreen buildNewBase()
 			if (rules->getCities()->empty())
 				continue;
 			std::string name = state->tr(rules->getType());
+			b.BeginStop("region:" + rules->getType());
 			b.PushContext(build->isFirst() ? name : Vocab::format(Vocab::REGION_BASE_COST, { name, Unicode::formatFunding(rules->getBaseCost()) }));
 			for (size_t i = 0; i < rules->getCities()->size(); ++i)
 			{
@@ -1559,6 +1956,7 @@ AccessScreen buildNewBase()
 			b.PopContext();
 		}
 		// Cancel, when it's there (not for the first base).
+		b.BeginStop("buttons");
 		addWidgets(b, state);
 	};
 	return s;
@@ -1641,6 +2039,7 @@ AccessScreen selectDestination()
 		std::stable_sort(targets.begin(), targets.end(), [craft](Target *a, Target *b) { return craft->getDistance(a) < craft->getDistance(b); });
 		if (!targets.empty())
 		{
+			b.BeginStop("targets");
 			b.PushContext(Vocab::get(Vocab::DEST_TARGETS));
 			for (Target *t : targets)
 			{
@@ -1659,6 +2058,7 @@ AccessScreen selectDestination()
 			RuleRegion *rules = region->getRules();
 			if (rules->getCities()->empty())
 				continue;
+			b.BeginStop("region:" + rules->getType());
 			b.PushContext(state->tr(rules->getType()));
 			for (size_t i = 0; i < rules->getCities()->size(); ++i)
 			{
@@ -1681,13 +2081,15 @@ AccessScreen selectDestination()
 			b.PopContext();
 		}
 		// Cancel, and Cydonia when it's offered.
+		b.BeginStop("buttons");
 		addWidgets(b, state);
 	};
 	return s;
 }
 
 /// The Basescape's menu: says the base, its region and the funds on arrival, then the buttons
-/// (and the base name field), then the other bases to switch to. The facility grid isn't covered yet.
+/// (and the base name field), the facility grid (Enter dismantles, Backspace opens the facility's
+/// screen, as the mouse buttons do), then the other bases to switch to.
 /// The game's number keys switch bases too; either way the tick says the new base.
 AccessScreen basescape()
 {
@@ -1705,7 +2107,21 @@ AccessScreen basescape()
 	s.build = [](GraphBuilder &b, State *state)
 	{
 		BasescapeState *bs = static_cast<BasescapeState *>(state);
+		// Three Tab-stops: the menu, the grid, the other bases.
+		b.BeginStop("menu");
 		addWidgets(b, state);
+		b.BeginStop("grid");
+		// The game's clicks: left starts dismantling (with a confirmation), right opens the facility's screen.
+		BaseView *view = bs->getView();
+		GridHooks grid;
+		grid.secondary = [state, view](int x, int y)
+		{
+			view->selectSquare(x, y);
+			Controls::click(state, view, SDL_BUTTON_RIGHT);
+		};
+		grid.tooltip = Vocab::get(Vocab::BASE_GRID_HINT);
+		addBaseGrid(b, state, view, grid);
+		b.BeginStop("bases");
 		std::vector<Base *> *bases = State::getGamePtr()->getSavedGame()->getBases();
 		if (bases->size() < 2)
 			return;
@@ -1932,16 +2348,6 @@ AccessScreen craftInfo()
 	return s;
 }
 
-/// A table row with its columns named: "Pistol, QUANTITY: 2, SPACE USED: 1". The first cell names the row;
-/// headers are the game's string ids for the other columns, in order.
-std::string headedRow(State *state, TextList *list, size_t row, const std::vector<std::string> &headers)
-{
-	std::string s = Controls::cellText(list, row, 0);
-	for (size_t i = 0; i < headers.size() && i + 1 < list->getCellCount(row); ++i)
-		s += ", " + Vocab::format(Vocab::HEADED_CELL, { std::string(state->tr(headers[i])), Controls::cellText(list, row, i + 1) });
-	return s;
-}
-
 /// A screen with one table: says its title, then lists the rows with their columns named, and the buttons.
 AccessScreen tableScreen(const std::string &key, std::function<bool(State *)> isActive, const std::vector<std::string> &headers)
 {
@@ -2025,6 +2431,7 @@ AccessScreen baseInfo()
 			{
 				if (open)
 					b.PopContext();
+				b.BeginStop("section:" + label->getText());
 				b.PushContext(label->getText());
 				open = true;
 				continue;
@@ -2036,6 +2443,7 @@ AccessScreen baseInfo()
 		}
 		if (open)
 			b.PopContext();
+		b.BeginStop("buttons");
 		addWidgets(b, state);
 	};
 	s.tick = [](State *state)
@@ -2068,11 +2476,13 @@ AccessScreen monthlyCosts()
 		for (const std::pair<const char *, TextList *> &t : tables)
 		{
 			TextList *list = t.second;
+			b.BeginStop(t.first);
 			b.PushContext(state->tr(t.first));
 			for (size_t row = 0; row < list->getTexts(); ++row)
 				addLine(b, ControlId::Referenced(list, std::string(t.first) + ":" + std::to_string(row)), [state, list, row, headers] { return headedRow(state, list, row, headers); });
 			b.PopContext();
 		}
+		b.BeginStop("totals");
 		TextList *rest[] = { mc->getMaintenanceList(), mc->getTotalList() };
 		for (size_t i = 0; i < 2; ++i)
 		{
@@ -2182,6 +2592,7 @@ AccessScreen article()
 			v.OnAdjust = page;
 			b.AddItem(ControlId::Referenced(a, "stat:" + std::to_string(i)), v);
 		}
+		b.BeginStop("text");
 		if (!info.empty())
 		{
 			NodeVtable v;
@@ -2234,8 +2645,8 @@ const std::vector<AccessScreen> &all()
 		simpleScreen("pause", is<PauseState>),
 		simpleScreen("abandonGame", is<AbandonGameState>),
 		simpleScreen("abortMission", is<AbortMissionState>),
-		simpleScreen("listLoad", is<ListLoadState>),
-		simpleScreen("listSave", is<ListSaveState>),
+		listGames("listLoad", is<ListLoadState>),
+		listGames("listSave", is<ListSaveState>),
 		simpleScreen("deleteGame", is<DeleteGameState>),
 		simpleScreen("confirmLoad", is<ConfirmLoadState>),
 		simpleScreen("errorMessage", is<ErrorMessageState>),
@@ -2283,6 +2694,15 @@ const std::vector<AccessScreen> &all()
 		popupScreen("transferConfirm", is<TransferConfirmState>),
 		alienContainment(),
 		placeLift(),
+		buildFacilities(),
+		placeFacility(),
+		simpleScreen("dismantleFacility", is<DismantleFacilityState>),
+		manufacture(),
+		newManufactureList(),
+		manufactureStart(),
+		manufactureInfo(),
+		simpleScreen("sackSoldier", is<SackSoldierState>),
+		simpleScreen("memorial", is<SoldierMemorialState>),
 		tableScreen("soldiers", is<SoldiersState>, {}),
 		research(),
 		tableScreen("newResearchList", is<NewResearchListState>, {}),

@@ -546,6 +546,51 @@ void ManufactureInfoState::lessUnitClick(Action *action)
 }
 
 /**
+ * Adds or removes engineers, as the engineer arrows do (accessibility).
+ * @param sign Above 0 adds, otherwise removes.
+ * @param count How many; INT_MAX for as many as possible.
+ */
+void ManufactureInfoState::changeEngineers(int sign, int count)
+{
+	if (sign > 0)
+		moreEngineer(count);
+	else
+		lessEngineer(count);
+}
+
+/**
+ * Adds or removes units to produce, as the unit arrows' clicks do (accessibility).
+ * @param sign Above 0 adds, otherwise removes.
+ * @param count How many; INT_MAX is the arrows' right click.
+ */
+void ManufactureInfoState::changeUnits(int sign, int count)
+{
+	if (sign > 0)
+	{
+		if (_production->getInfiniteAmount())
+			return;
+		if (count == INT_MAX && _production->getRules()->getCategory() != "STR_CRAFT")
+		{
+			_production->setInfiniteAmount(true);
+			setAssignedEngineer();
+		}
+		else
+		{
+			moreUnit(count);
+		}
+		return;
+	}
+	_production->setInfiniteAmount(false);
+	if (count == INT_MAX || _production->getAmountTotal() <= _production->getAmountProduced())
+	{
+		_production->setAmountTotal(_production->getAmountProduced() + 1);
+		setAssignedEngineer();
+	}
+	if (count != INT_MAX)
+		lessUnit(count);
+}
+
+/**
  * Assigns one more engineer (if possible).
  */
 void ManufactureInfoState::onMoreEngineer()

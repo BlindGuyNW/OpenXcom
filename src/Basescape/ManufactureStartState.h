@@ -48,6 +48,14 @@ public:
 	void btnCancelClick(Action *action);
 	/// Handler for the start button.
 	void btnStartClick(Action *action);
+	/// Gets the base (for the accessibility layer).
+	Base *getBase() const { return _base; }
+	/// Gets what would be made (accessibility).
+	RuleManufacture *getRule() const { return _item; }
+	/// Gets the Start Production button, hidden when production can't start (accessibility).
+	TextButton *getStartButton() const { return _btnStart; }
+	/// Gets the list of special materials (accessibility).
+	TextList *getRequiredList() const { return _lstRequiredItems; }
 };
 
 }

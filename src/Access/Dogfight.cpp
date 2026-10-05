@@ -167,6 +167,8 @@ namespace
 		for (DogfightState *d : openDogfights(geo))
 		{
 			std::string key = keyFor(d);
+			// One Tab-stop per window.
+			b.BeginStop(key);
 			b.PushContext(Vocab::format(Vocab::DF_TITLE, { d->getCraft()->getName(lang()), d->getUfo()->getName(lang()) }));
 
 			b.AddItem(ControlId::Referenced(d, key + "info"), textNode([d]
