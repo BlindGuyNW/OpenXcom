@@ -54,6 +54,12 @@ public:
 	void btnCancelClick(Action *action);
 	/// Handler for clicking the Weapons list.
 	void lstWeaponsClick(Action *action);
+	/// Gets the base (accessibility).
+	Base *getBase() const { return _base; }
+	/// Gets the craft's index in the base (accessibility).
+	size_t getCraftIndex() const { return _craft; }
+	/// Gets the weapon slot being changed (accessibility).
+	size_t getSlot() const { return _weapon; }
 };
 
 }

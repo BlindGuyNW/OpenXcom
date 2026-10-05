@@ -242,6 +242,7 @@ namespace Vocab
 		GRID_SQUARE,
 		UNDER_CONSTRUCTION,
 		BASE_GRID,
+		ARMAMENT_ROW,
 		COUNT
 	};
 

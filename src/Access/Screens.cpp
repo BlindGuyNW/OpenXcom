@@ -122,6 +122,7 @@
 #include "../Mod/RuleCraftWeapon.h"
 #include "../Savegame/CraftWeapon.h"
 #include "../Basescape/CraftSoldiersState.h"
+#include "../Basescape/CraftWeaponsState.h"
 #include "../Basescape/SoldierArmorState.h"
 #include "../Basescape/SoldierInfoState.h"
 #include "../Engine/Action.h"
@@ -1355,6 +1356,45 @@ AccessScreen placeLift()
 	return s;
 }
 
+/// A craft's weapon slot: "weapon 1, STINGRAY, ammo 6 of 6", or "weapon 1, none".
+std::string weaponSlotText(State *state, Craft *c, size_t slot)
+{
+	CraftWeapon *w = slot < c->getWeapons()->size() ? c->getWeapons()->at(slot) : 0;
+	std::string n = std::to_string(slot + 1);
+	if (!w)
+		return Vocab::format(Vocab::CRAFT_WEAPON_NONE, { n });
+	return Vocab::format(Vocab::CRAFT_WEAPON, { n, state->tr(w->getRules()->getType()),
+		std::to_string(w->getAmmo()), std::to_string(w->getRules()->getAmmoMax()) });
+}
+
+/// Picking a craft weapon: says the title and what the slot holds now, then the weapons in stores
+/// ("Stingray, 2 in stores, ammunition 30"); Enter mounts one (None takes it off), as clicking the row does.
+AccessScreen craftWeapons()
+{
+	AccessScreen s = simpleScreen("craftWeapons", is<CraftWeaponsState>);
+	s.name = [](State *state)
+	{
+		CraftWeaponsState *cw = static_cast<CraftWeaponsState *>(state);
+		Craft *c = cw->getBase()->getCrafts()->at(cw->getCraftIndex());
+		return firstText(state) + ". " + c->getName(State::getGamePtr()->getLanguage()) + ", " + weaponSlotText(state, c, cw->getSlot());
+	};
+	s.build = [](GraphBuilder &b, State *state)
+	{
+		addWidgets(b, state, [](Surface *surface, size_t row, NodeVtable &v)
+		{
+			TextList *list = dynamic_cast<TextList *>(surface);
+			if (!list || row == NO_ROW || list->getCellCount(row) < 3)
+				return;
+			v.Announcements.clear();
+			v.Announcements.push_back(NodeAnnouncement([list, row]
+			{
+				return Vocab::format(Vocab::ARMAMENT_ROW, { Controls::cellText(list, row, 0), Controls::cellText(list, row, 1), Controls::cellText(list, row, 2) });
+			}, false, AnnouncementKinds::Label));
+		});
+	};
+	return s;
+}
+
 /// "Aliens killed: 1, score 10": a debriefing score row (item, quantity, score).
 std::string debriefRow(TextList *list, size_t row)
 {
@@ -1751,13 +1791,8 @@ AccessScreen craftInfo()
 		}
 		for (int i = 0; i < 2 && i < (int)c->getRules()->getWeapons(); ++i)
 		{
-			CraftWeapon *w = i < (int)c->getWeapons()->size() ? c->getWeapons()->at(i) : 0;
-			std::string n = std::to_string(i + 1);
-			std::string label = w ? Vocab::format(Vocab::CRAFT_WEAPON, { n, state->tr(w->getRules()->getType()),
-					std::to_string(w->getAmmo()), std::to_string(w->getRules()->getAmmoMax()) })
-				: Vocab::format(Vocab::CRAFT_WEAPON_NONE, { n });
 			TextButton *btn = ci->getWeaponButton(i);
-			b.AddItem(ControlId::Referenced(btn, "weapon:" + n), Controls::labelledButton(state, btn, label));
+			b.AddItem(ControlId::Referenced(btn, "weapon:" + std::to_string(i + 1)), Controls::labelledButton(state, btn, weaponSlotText(state, c, i)));
 		}
 		if (c->getRules()->getSoldiers() > 0)
 		{
@@ -2060,6 +2095,7 @@ const std::vector<AccessScreen> &all()
 	static const std::vector<AccessScreen> screens = {
 		mainMenu(), newBattle(), briefing(), inventory(), nextTurn(),
 		craftInfo(),
+		craftWeapons(),
 		simpleScreen("craftSoldiers", is<CraftSoldiersState>),
 		craftEquipment(),
 		simpleScreen("craftArmor", is<CraftArmorState>),

@@ -239,6 +239,7 @@ namespace
 		"{0}, row {1}, column {2}",
 		"{0}, under construction, {1} days",
 		"base grid",
+		"{0}, {1} in stores, ammunition {2}",
 	};
 }
 
