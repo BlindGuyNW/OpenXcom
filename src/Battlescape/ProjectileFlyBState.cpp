@@ -39,6 +39,7 @@
 #include "BattlescapeState.h"
 #include "../Savegame/BattleUnitStatistics.h"
 #include "../fmath.h"
+#include "../Access/Battle.h"
 
 namespace OpenXcom
 {
@@ -726,6 +727,10 @@ void ProjectileFlyBState::think()
 					_action.weapon->spendAmmoForAction(_action.type, _parent->getSave());
 				}
 
+				if (_projectileImpact == V_OUTOFBOUNDS)
+				{
+					Battle::shotOffMap(_parent->getSave());
+				}
 				if (_projectileImpact != V_OUTOFBOUNDS)
 				{
 					bool shotgun = _ammo && _ammo->getRules()->getShotgunPellets() != 0 && _ammo->getRules()->getDamageType()->isDirect();

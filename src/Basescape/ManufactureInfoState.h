@@ -126,6 +126,21 @@ public:
 	~ManufactureInfoState();
 	/// Resets state.
 	void init() override;
+	/// Gets the base (for the accessibility layer).
+	Base *getBase() const { return _base; }
+	/// Gets the production being set up (accessibility).
+	Production *getProduction() const { return _production; }
+	/// Gets the monthly profit line (accessibility).
+	Text *getProfitText() const { return _txtMonthlyProfit; }
+	/// Gets the OK, Stop Production and Sell buttons (accessibility).
+	TextButton *getOkButton() const { return _btnOk; }
+	TextButton *getStopButton() const { return _btnStop; }
+	ToggleTextButton *getSellButton() const { return _btnSell; }
+	/// Adds (sign > 0) or removes engineers, as the engineer arrows do; INT_MAX is as many as possible (accessibility).
+	void changeEngineers(int sign, int count);
+	/// Adds or removes units to produce, as the unit arrows do; INT_MAX is their right click:
+	/// no limit (or every free hangar for craft) going up, the fewest possible going down (accessibility).
+	void changeUnits(int sign, int count);
 };
 
 }

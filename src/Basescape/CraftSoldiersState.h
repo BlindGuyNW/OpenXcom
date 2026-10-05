@@ -83,6 +83,10 @@ public:
 	/// Handler for clicking the De-assign All Soldiers button.
 	void btnDeassignAllSoldiersClick(Action *action);
 	void btnDeassignCraftSoldiersClick(Action *action);
+	/// Gets the base (accessibility layer).
+	Base *getBase() const { return _base; }
+	/// Gets the craft's index in the base (accessibility layer).
+	size_t getCraftIndex() const { return _craft; }
 };
 
 }

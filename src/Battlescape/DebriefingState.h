@@ -133,6 +133,23 @@ public:
 	void decreaseRecoveredItemCount(const RuleItem *rule, int amount);
 	// Hides the SELL and TRANSFER buttons.
 	void hideSellTransferButtons();
+	/// Accessibility layer: the widgets it reads.
+	Text *getTitle() const { return _txtTitle; }
+	Text *getRating() const { return _txtRating; }
+	Text *getRecoveryHeading() const { return _txtRecovery; }
+	TextList *getStatsList() const { return _lstStats; }
+	TextList *getRecoveryList() const { return _lstRecovery; }
+	TextList *getTotalList() const { return _lstTotal; }
+	TextList *getSoldierStatsList() const { return _lstSoldierStats; }
+	TextList *getRecoveredItemsList() const { return _lstRecoveredItems; }
+	/// The soldier stats table's column headers after the name, in column order. Their tooltips name the stat.
+	std::vector<Text *> getSoldierStatHeaders() const { return { _txtTU, _txtStamina, _txtHealth, _txtBravery, _txtReactions, _txtFiring, _txtThrowing, _txtMelee, _txtStrength, _txtPsiStrength, _txtPsiSkill }; }
+	/// Which page is showing: 0 the scores, 1 the soldiers' stat gains, 2 the recovered items.
+	int getPageNumber() const { return _pageNumber; }
+	TextButton *getOkButton() const { return _btnOk; }
+	TextButton *getStatsButton() const { return _btnStats; }
+	TextButton *getSellButton() const { return _btnSell; }
+	TextButton *getTransferButton() const { return _btnTransfer; }
 };
 
 }

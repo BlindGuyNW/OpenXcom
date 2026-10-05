@@ -58,5 +58,15 @@ public:
 	MedikitState(BattleUnit *targetUnit, BattleAction *action, TileEngine *tile);
 	/// Handler for right-clicking anything.
 	void handle(Action *action) override;
+	/// Accessors for the accessibility layer.
+	BattleUnit *getTarget() const { return _targetUnit; }
+	BattleUnit *getHealer() const;
+	BattleItem *getItem() const { return _item; }
+	MedikitView *getView() const { return _medikitView; }
+	int getTUCost() const;
+	InteractiveSurface *getHealButton() const { return _healButton; }
+	InteractiveSurface *getStimulantButton() const { return _stimulantButton; }
+	InteractiveSurface *getPainKillerButton() const { return _pkButton; }
+	InteractiveSurface *getEndButton() const { return _endButton; }
 };
 }

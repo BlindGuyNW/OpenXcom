@@ -125,6 +125,8 @@ private:
 	const int _maxStaticLightDistance;
 	const int _maxDynamicLightDistance;
 	const int _enhancedLighting;
+	BattleUnit *_lastHitUnit;
+	MapData *_lastHitPart;
 	Position _eventVisibilitySectorL, _eventVisibilitySectorR, _eventVisibilityObserverPos;
 	std::vector<BattleUnit*> _movingUnitPrev;
 	BattleUnit* _movingUnit = nullptr;
@@ -195,6 +197,9 @@ public:
 	bool hitUnit(BattleActionAttack attack, BattleUnit *target, const Position &relative, int damage, const RuleDamageType *type, bool rangeAtack = true);
 	/// Handles bullet/weapon hits.
 	void hit(BattleActionAttack attack, Position center, int power, const RuleDamageType *type, bool rangeAtack = true, int terrainMeleeTilePart = 0);
+	/// What the last hit() struck: a unit, or else a terrain piece (either may be null). For the accessibility layer.
+	BattleUnit *getLastHitUnit() const { return _lastHitUnit; }
+	MapData *getLastHitPart() const { return _lastHitPart; }
 	/// Handles explosions.
 	void explode(BattleActionAttack attack, Position center, int power, const RuleDamageType *type, int maxRadius, bool rangeAtack = true);
 	/// Checks if a destroyed tile starts an explosion.

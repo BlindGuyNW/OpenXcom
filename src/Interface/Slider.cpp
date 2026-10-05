@@ -245,6 +245,40 @@ int Slider::getValue() const
 }
 
 /**
+ * Returns the smallest value of the slider's range.
+ * @return Minimum.
+ */
+int Slider::getMin() const
+{
+	return std::min(_min, _max);
+}
+
+/**
+ * Returns the largest value of the slider's range.
+ * @return Maximum.
+ */
+int Slider::getMax() const
+{
+	return std::max(_min, _max);
+}
+
+/**
+ * Runs the change handler, if any, with a blank action (accessibility).
+ * @param state State the handler belongs to.
+ */
+void Slider::notifyChange(State *state)
+{
+	if (_change)
+	{
+		// OXCE's handlers may read the action (isLeftClick and the like), so give them a blank one, not null.
+		SDL_Event ev = {};
+		Action action(&ev, 1.0, 1.0, 0, 0);
+		action.setSender(this);
+		(state->*_change)(&action);
+	}
+}
+
+/**
  * Blits the slider contents
  * @param surface Pointer to surface to blit onto.
  */

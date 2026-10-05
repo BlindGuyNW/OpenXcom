@@ -80,6 +80,12 @@ public:
 	void setSelectable(int sizeX, int sizeY);
 	/// Checks if a facility can be placed. Returns 0 if it can, otherwise an int for why not.
 	BasePlacementErrors getPlacementError(const RuleBaseFacility *rule, BaseFacility *facilityBeingMoved = nullptr, bool isStartFacility = false) const;
+	/// Selects a square as hovering it with the mouse would (accessibility).
+	void selectSquare(int x, int y);
+	/// Gets the facility covering a square, or null (accessibility).
+	BaseFacility *getFacilityAt(int x, int y) const;
+	/// Checks a new facility's placement with its top left corner on a square, keeping the selection (accessibility).
+	BasePlacementErrors getPlacementErrorAt(const RuleBaseFacility *rule, int x, int y);
 	/// Checks if the placed facility is placed in queue or not.
 	bool isQueuedBuilding(const RuleBaseFacility *rule) const;
 	/// ReCalculates the remaining build-time of all queued buildings.

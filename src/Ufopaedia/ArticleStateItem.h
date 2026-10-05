@@ -35,6 +35,8 @@ namespace OpenXcom
 
 	class ArticleStateItem : public ArticleState
 	{
+		/// Reads the article for the accessibility layer.
+		friend struct ArticleAccess;
 	public:
 		ArticleStateItem(ArticleDefinitionItem *article_defs, std::shared_ptr<ArticleCommonState> state);
 		virtual ~ArticleStateItem();

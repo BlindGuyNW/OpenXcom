@@ -82,6 +82,12 @@ public:
 	void setArrowColor(Uint8 color);
 	/// Gets the selected option in the list.
 	size_t getSelected() const;
+	/// Gets the number of options in the list.
+	size_t getOptionCount() const;
+	/// Gets the text shown on the button: the selected option, or whatever setText put there.
+	std::string getSelectedText() const;
+	/// Runs the change handler, the way picking an option from the list does.
+	void notifyChange(State *state);
 	/// Gets the item that is currently hovered over in the popup list, or the current
 	/// selected item if no item is hovered over.
 	size_t getHoveredListIdx() const;

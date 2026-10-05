@@ -227,6 +227,7 @@ void ActionMenuState::addItem(BattleActionType ba, const std::string &name, int 
 		s1 = tr("STR_ACCURACY_SHORT").arg(Unicode::formatPercentage(acc));
 	s2 = tr("STR_TIME_UNITS_SHORT").arg(tu);
 	_actionMenu[*id]->setAction(ba, tr(name), s1, s2, tu);
+	_actionMenu[*id]->setAccuracy(s1.empty() ? -1 : acc);
 	_actionMenu[*id]->setVisible(true);
 	if (key != SDLK_UNKNOWN)
 	{

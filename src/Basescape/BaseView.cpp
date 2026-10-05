@@ -666,6 +666,60 @@ void BaseView::blit(SDL_Surface *surface)
 }
 
 /**
+ * Selects a square the way hovering it with the mouse does:
+ * the selected facility, and the selector when placing something (accessibility).
+ * @param x Grid X.
+ * @param y Grid Y.
+ */
+void BaseView::selectSquare(int x, int y)
+{
+	if (x < 0 || x >= BASE_SIZE || y < 0 || y >= BASE_SIZE)
+		return;
+	_gridX = x;
+	_gridY = y;
+	_selFacility = _facilities[x][y];
+	if (_selSizeX > 0 && _selSizeY > 0)
+	{
+		bool fits = _gridX + _selSizeX - 1 < BASE_SIZE && _gridY + _selSizeY - 1 < BASE_SIZE;
+		_selector->setX(_x + _gridX * GRID_SIZE);
+		_selector->setY(_y + _gridY * GRID_SIZE);
+		_selector->setVisible(fits);
+	}
+}
+
+/**
+ * Gets the facility covering a square (accessibility).
+ * @param x Grid X.
+ * @param y Grid Y.
+ * @return The facility, or null if the square is empty or off the grid.
+ */
+BaseFacility *BaseView::getFacilityAt(int x, int y) const
+{
+	if (x < 0 || x >= BASE_SIZE || y < 0 || y >= BASE_SIZE)
+		return 0;
+	return _facilities[x][y];
+}
+
+/**
+ * Checks if a new facility could be placed with its top left corner on a square,
+ * without moving the selection (accessibility).
+ * @param rule Facility type.
+ * @param x Grid X.
+ * @param y Grid Y.
+ * @return Why not, or BPE_None.
+ */
+BasePlacementErrors BaseView::getPlacementErrorAt(const RuleBaseFacility *rule, int x, int y)
+{
+	int oldX = _gridX, oldY = _gridY;
+	_gridX = x;
+	_gridY = y;
+	BasePlacementErrors error = getPlacementError(rule);
+	_gridX = oldX;
+	_gridY = oldY;
+	return error;
+}
+
+/**
  * Selects the facility the mouse is over.
  * @param action Pointer to an action.
  * @param state State that the action handlers belong to.

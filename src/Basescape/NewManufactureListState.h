@@ -81,6 +81,8 @@ public:
 	void btnMarkAllAsSeenClick(Action *action);
 	/// Fills the list of possible productions.
 	void fillProductionList(bool refreshCategories);
+	/// Gets the category filter (for the accessibility layer).
+	ComboBox *getCategory() const { return _cbxCategory; }
 };
 
 }

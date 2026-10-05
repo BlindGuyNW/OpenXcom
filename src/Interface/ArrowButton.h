@@ -49,6 +49,8 @@ public:
 	void setColor(Uint8 color) override;
 	/// Sets the arrow button's shape.
 	void setShape(ArrowShape shape);
+	/// Gets the arrow button's shape.
+	ArrowShape getShape() const { return _shape; }
 	/// Sets the arrow button's list.
 	void setTextList(TextList *list);
 	/// Handles the timers.

@@ -88,6 +88,8 @@ public:
 	Position getTarget() const;
 	/// Gets the distance that projectile traveled.
 	float getDistance() const;
+	/// Gets the unit that fired or threw it (accessibility layer).
+	BattleUnit *getActor() const { return _action.actor; }
 	/// Is this projectile being drawn back-to-front or front-to-back?
 	bool isReversed() const;
 	/// adds a cloud of particles at the projectile's location

@@ -177,6 +177,22 @@ public:
 	bool getWaitForAltitude() const;
 	/// Award experience to the pilots.
 	void awardExperienceToPilots();
+	/// Gets the attack mode buttons: standoff, cautious, standard, aggressive, disengage.
+	std::vector<ImageButton*> getModeButtons() const { return { _btnStandoff, _btnCautious, _btnStandard, _btnAggressive, _btnDisengage }; }
+	/// Gets the pressed attack mode button.
+	ImageButton *getMode() const { return _mode; }
+	/// Gets how many weapon slots the window shows (accessibility).
+	int getWeaponCount() const { return _weaponNum; }
+	/// Gets the button that toggles a weapon.
+	InteractiveSurface *getWeaponButton(int i) const { return _weapon[i]; }
+	/// Is a weapon switched on?
+	bool isWeaponEnabled(int i) const { return _weaponEnabled[i]; }
+	/// Gets the distance to the UFO, as the window shows it.
+	int getCurrentDistance() const { return _currentDist; }
+	/// Gets the minimize button.
+	InteractiveSurface *getMinimizeButton() const { return _btnMinimize; }
+	/// Gets the icon that restores a minimized interception.
+	InteractiveSurface *getMinimizedIcon() const { return _btnMinimizedIcon; }
 };
 
 }

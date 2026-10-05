@@ -898,7 +898,7 @@ TileEngine::TileEngine(SavedBattleGame *save, Mod *mod) :
 	_maxViewDistance(mod->getMaxViewDistance()), _maxViewDistanceSq(_maxViewDistance * _maxViewDistance),
 	_maxVoxelViewDistance(_maxViewDistance * 16), _maxDarknessToSeeUnits(mod->getMaxDarknessToSeeUnits()),
 	_maxStaticLightDistance(mod->getMaxStaticLightDistance()), _maxDynamicLightDistance(mod->getMaxDynamicLightDistance()),
-	_enhancedLighting(mod->getEnhancedLighting())
+	_enhancedLighting(mod->getEnhancedLighting()), _lastHitUnit(0), _lastHitPart(0)
 {
 	_blockVisibility.resize(save->getMapSizeXYZ());
 	_lightPropagationTerrainBlocking.resize(save->getMapSizeXYZ());
@@ -3219,6 +3219,8 @@ bool TileEngine::hitUnit(BattleActionAttack attack, BattleUnit *target, const Po
  */
 void TileEngine::hit(BattleActionAttack attack, Position center, int power, const RuleDamageType *type, bool rangeAtack, int terrainMeleeTilePart)
 {
+	_lastHitUnit = 0;
+	_lastHitPart = 0;
 	bool terrainChanged = false; //did the hit destroy a tile thereby changing line of sight?
 	int effectGenerated = 0; //did the hit produce smoke (1), fire/light (2) or disabled a unit (3) ?
 	Position tilePos = center.toTile();
@@ -3234,6 +3236,7 @@ void TileEngine::hit(BattleActionAttack attack, Position center, int power, cons
 	const int tileFinalDamage = type->getTileFinalDamage(type->getRandomDamageForTile(power, damage));
 	if (part >= V_FLOOR && part <= V_OBJECT)
 	{
+		_lastHitPart = tile->getMapData((TilePart)part);
 		bool nothing = true;
 		if (terrainMeleeTilePart == 0 && (part == V_FLOOR || part == V_OBJECT))
 		{
@@ -3278,6 +3281,7 @@ void TileEngine::hit(BattleActionAttack attack, Position center, int power, cons
 			{
 				verticaloffset = 24;
 			}
+			_lastHitUnit = bu;
 			const int sz = bu->getArmor()->getSize() * 8;
 			const Position target = bu->getPosition().toVoxel() + Position(sz,sz, bu->getFloatHeight() - tile->getTerrainLevel());
 			const Position relative = (center - target) - Position(0,0,verticaloffset);

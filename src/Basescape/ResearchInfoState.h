@@ -70,6 +70,11 @@ public:
 	void less();
 	/// Remove the given number of scientists from the project if possible
 	void lessByValue(int change);
+	// For the accessibility layer.
+	ResearchProject *getProject() const { return _project; }
+	Base *getBase() const { return _base; }
+	TextButton *getOkButton() const { return _btnOk; }
+	TextButton *getCancelButton() const { return _btnCancel; }
 	/// Handler for using the mouse wheel.
 	void handleWheel(Action *action);
 	/// Handler for pressing the More button.

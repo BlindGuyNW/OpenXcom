@@ -49,6 +49,8 @@ private:
 	std::vector<Craft*> _crafts;
 	std::vector<Craft*> _selCrafts;
 public:
+	/// Gets the crafts in list order.
+	const std::vector<Craft*> &getCrafts() const { return _crafts; }
 	/// Creates the Intercept state.
 	InterceptState(Globe *globe, bool useCustomSound, Base *base = 0, Target *target = 0);
 	/// Cleans up the Intercept state.

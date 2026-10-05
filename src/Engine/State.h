@@ -82,6 +82,8 @@ public:
 	}
 	/// Add a optional child element but it will not be displayed.
 	void preAdd(Surface *surface);
+	/// Gets the state's child elements, in the order they were added.
+	const std::vector<Surface*> &getSurfaces() const { return _surfaces; }
 	/// Adds a child element to the state.
 	void add(Surface *surface);
 	/// Adds a child element to the state.
@@ -124,6 +126,8 @@ public:
 	void applyBattlescapeTheme(const std::string& category);
 	/// Sets game object pointer
 	static void setGamePtr(Game* game);
+	/// Gets game object pointer (for the accessibility layer).
+	static Game *getGamePtr() { return _game; }
 	/// Sets a modal surface.
 	void setModal(InteractiveSurface *surface);
 

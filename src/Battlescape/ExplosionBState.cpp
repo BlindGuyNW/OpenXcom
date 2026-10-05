@@ -31,6 +31,7 @@
 #include "../Mod/RuleItem.h"
 #include "../Mod/Armor.h"
 #include "../Engine/RNG.h"
+#include "../Access/Battle.h"
 
 namespace OpenXcom
 {
@@ -206,7 +207,9 @@ void ExplosionBState::init()
 	{
 		if (_power > 0)
 		{
+			Battle::beginImpact(_parent->getSave());
 			_parent->getSave()->getTileEngine()->explode(_attack, _center, _power, _damageType, _radius, range);
+			Battle::endImpact(_parent->getSave(), _attack.attacker, true);
 
 			int powerForAnimation = _power;
 			if (itemRule && itemRule->getPowerForAnimation() > 0)
@@ -271,7 +274,9 @@ void ExplosionBState::init()
 	else
 	// create a bullet hit
 	{
+		Battle::beginImpact(_parent->getSave());
 		_parent->getSave()->getTileEngine()->hit(_attack, _center, _power, _damageType, range, _terrainMeleeTilePart);
+		Battle::endImpact(_parent->getSave(), _attack.attacker, false);
 
 		_parent->setStateInterval(std::max(1, ((BattlescapeState::DEFAULT_ANIM_SPEED/2) - (10 * itemRule->getExplosionSpeed()))));
 		int anim = -1;

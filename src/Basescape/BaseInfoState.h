@@ -17,6 +17,8 @@
  * You should have received a copy of the GNU General Public License
  * along with OpenXcom.  If not, see <http://www.gnu.org/licenses/>.
  */
+#include <utility>
+#include <vector>
 #include "../Engine/State.h"
 
 namespace OpenXcom
@@ -80,6 +82,10 @@ public:
 	void btnStoresClick(Action *action);
 	/// Handler for clicking the Monthly Costs button.
 	void btnMonthlyCostsClick(Action *action);
+	/// Gets the base shown (for the accessibility layer).
+	Base *getBase() const { return _base; }
+	/// The stat lines in screen order as (label, value) pairs; a null value marks a section heading (for the accessibility layer).
+	std::vector<std::pair<Text *, Text *> > getLines() const;
 };
 
 }

@@ -253,6 +253,40 @@ size_t ComboBox::getSelected() const
 	return _sel;
 }
 
+/**
+ * Returns the number of options in the list.
+ * @return Option count.
+ */
+size_t ComboBox::getOptionCount() const
+{
+	return _list->getTexts();
+}
+
+/**
+ * Returns the text on the button.
+ * @return Button text.
+ */
+std::string ComboBox::getSelectedText() const
+{
+	return _button->getText();
+}
+
+/**
+ * Runs the change handler, if any, with a blank action (accessibility).
+ * @param state State the handler belongs to.
+ */
+void ComboBox::notifyChange(State *state)
+{
+	if (_change)
+	{
+		// OXCE's handlers may read the action (isLeftClick and the like), so give them a blank one, not null.
+		SDL_Event ev = {};
+		Action action(&ev, 1.0, 1.0, 0, 0);
+		action.setSender(this);
+		(state->*_change)(&action);
+	}
+}
+
 size_t ComboBox::getHoveredListIdx() const
 {
 	size_t ret = -1;

@@ -59,6 +59,8 @@ public:
 	void btnOkClick(Action *action);
 	/// Handler for clicking the Facilities list.
 	virtual void lstFacilitiesClick(Action *action);
+	/// Gets the facilities in the list, in row order (for the accessibility layer).
+	const std::vector<RuleBaseFacility *> &getFacilities() const { return _facilities; }
 };
 
 }

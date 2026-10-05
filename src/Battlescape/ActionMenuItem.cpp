@@ -33,7 +33,7 @@ namespace OpenXcom
  * @param x Position on the x-axis.
  * @param y Position on the y-axis.
  */
-ActionMenuItem::ActionMenuItem(int id, Game *game, int x, int y) : InteractiveSurface(272, 40, x + 24, y - (id*40)), _highlighted(false), _action(BA_NONE), _skill(nullptr), _tu(0)
+ActionMenuItem::ActionMenuItem(int id, Game *game, int x, int y) : InteractiveSurface(272, 40, x + 24, y - (id*40)), _highlighted(false), _action(BA_NONE), _skill(nullptr), _tu(0), _accuracy(-1)
 {
 	Font *big = game->getMod()->getFont("FONT_BIG"), *small = game->getMod()->getFont("FONT_SMALL");
 	Language *lang = game->getLanguage();
@@ -131,6 +131,33 @@ const RuleSkill* ActionMenuItem::getSkill() const
 int ActionMenuItem::getTUs() const
 {
 	return _tu;
+}
+
+/**
+ * Sets the accuracy shown on this menu item.
+ * @param accuracy Accuracy percentage, -1 for none.
+ */
+void ActionMenuItem::setAccuracy(int accuracy)
+{
+	_accuracy = accuracy;
+}
+
+/**
+ * Gets the accuracy shown on this menu item.
+ * @return Accuracy percentage, -1 for none.
+ */
+int ActionMenuItem::getAccuracy() const
+{
+	return _accuracy;
+}
+
+/**
+ * Gets the action's description text.
+ * @return The description.
+ */
+std::string ActionMenuItem::getDescription() const
+{
+	return _txtDescription->getText();
 }
 
 /**

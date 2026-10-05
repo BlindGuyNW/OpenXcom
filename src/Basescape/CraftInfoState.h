@@ -83,6 +83,16 @@ public:
 	void btnPilotsClick(Action *action);
 	/// Handler for changing the text on the Name edit.
 	void edtCraftChange(Action *action);
+	// For the accessibility layer.
+	Craft *getCraft() const { return _craft; }
+	TextButton *getWeaponButton(int i) const { return _btnW[i]; }
+	TextButton *getCrewButton() const { return _btnCrew; }
+	TextButton *getEquipButton() const { return _btnEquip; }
+	TextButton *getArmorButton() const { return _btnArmor; }
+	TextButton *getOkButton() const { return _btnOk; }
+	TextEdit *getNameEdit() const { return _edtCraft; }
+	Text *getDamageText() const { return _txtDamage; }
+	Text *getFuelText() const { return _txtFuel; }
 };
 
 }

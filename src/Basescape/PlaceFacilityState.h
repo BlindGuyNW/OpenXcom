@@ -54,6 +54,14 @@ public:
 	void btnCancelClick(Action *action);
 	/// Handler for clicking the base view.
 	void viewClick(Action *action);
+	/// Gets the base view (for the accessibility layer).
+	BaseView *getView() const { return _view; }
+	/// Gets the facility being placed (accessibility).
+	const RuleBaseFacility *getRule() const { return _rule; }
+	/// Gets the base (accessibility).
+	Base *getBase() const { return _base; }
+	/// Gets the Cancel button (accessibility).
+	TextButton *getCancelButton() const { return _btnCancel; }
 };
 
 }

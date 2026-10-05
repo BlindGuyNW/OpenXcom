@@ -4,6 +4,21 @@ set ( root_src
   main.cpp
   md5.cpp
 )
+set ( access_src
+  Access/Speech.cpp
+  Access/Vocab.cpp
+  Access/Controls.cpp
+  Access/Navigator.cpp
+  Access/Screens.cpp
+  Access/Battle.cpp
+  Access/Dogfight.cpp
+  Access/Geo.cpp
+  Access/TerrainNames.cpp
+  Access/Graph/GraphAnnouncer.cpp
+  Access/Graph/GraphBuilder.cpp
+  Access/Graph/KeyGraph.cpp
+)
+
 set ( basescape_src
   Basescape/BaseInfoState.cpp
   Basescape/BasescapeState.cpp
@@ -443,6 +458,7 @@ set ( rapidyaml_src
 
 set ( cxx_src
     ${root_src}
+    ${access_src}
     ${basescape_src}
     ${battlescape_src}
     ${engine_src}
@@ -671,6 +687,7 @@ endif ()
 
 #Setup source groups for IDE
 if ( MSVC OR "${CMAKE_GENERATOR}" STREQUAL "Xcode" )
+  source_group ( "Access" FILES ${access_src} )
   source_group ( "Basescape" FILES ${basescape_src} )
   source_group ( "Battlescape" FILES ${battlescape_src} )
   source_group ( "Engine" FILES ${engine_src} )

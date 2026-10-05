@@ -51,6 +51,8 @@ public:
 	void handle(Action *action) override;
 	/// Handler for clicking a action menu item.
 	virtual void btnActionMenuItemClick(Action *action);
+	/// Gets the action being chosen for (for the accessibility layer).
+	BattleAction *getAction() const { return _action; }
 	/// Update the resolution settings, we just resized the window.
 	void resize(int &dX, int &dY) override;
 };

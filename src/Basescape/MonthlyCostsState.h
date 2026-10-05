@@ -48,6 +48,13 @@ public:
 	~MonthlyCostsState();
 	/// Handler for clicking the OK button.
 	void btnOkClick(Action *action);
+	// For the accessibility layer.
+	TextList *getCraftList() const { return _lstCrafts; }
+	TextList *getSalaryList() const { return _lstSalaries; }
+	TextList *getMaintenanceList() const { return _lstMaintenance; }
+	TextList *getTotalList() const { return _lstTotal; }
+	Text *getIncomeText() const { return _txtIncome; }
+	TextButton *getOkButton() const { return _btnOk; }
 };
 
 }

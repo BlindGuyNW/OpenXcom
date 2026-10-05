@@ -33,6 +33,8 @@ namespace OpenXcom
 
 	class ArticleStateCraft : public ArticleState
 	{
+		/// Reads the article for the accessibility layer.
+		friend struct ArticleAccess;
 	public:
 		ArticleStateCraft(ArticleDefinitionCraft *article_defs, std::shared_ptr<ArticleCommonState> state);
 		virtual ~ArticleStateCraft();

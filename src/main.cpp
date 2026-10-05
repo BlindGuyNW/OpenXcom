@@ -27,6 +27,9 @@
 #include "Engine/Options.h"
 #include "Engine/FileMap.h"
 #include "Menu/StartState.h"
+#include "Access/Speech.h"
+#include "Access/Vocab.h"
+#include "Access/Navigator.h"
 
 /** @mainpage
  * @author OpenXcom Developers
@@ -121,6 +124,9 @@ int main(int argc, char *argv[])
 		return EXIT_SUCCESS;
 	std::ostringstream title;
 	title << "OpenXcom " << OPENXCOM_VERSION_SHORT << OPENXCOM_VERSION_GIT;
+	Speech::init();
+	Speech::say(Vocab::get(Vocab::STARTUP), false);
+	Navigator::init();
 	Options::baseXResolution = Options::displayWidth;
 	Options::baseYResolution = Options::displayHeight;
 
@@ -133,6 +139,7 @@ int main(int argc, char *argv[])
 
 	// Comment those two for faster exit.
 	delete game;
+	Speech::shutdown();
 	FileMap::clear(true, false); // make valgrind happy
 
 	if (startUpdate)

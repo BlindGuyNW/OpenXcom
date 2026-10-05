@@ -1,6 +1,42 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
+    <ClCompile Include="Access\Speech.cpp">
+      <Filter>Access</Filter>
+    </ClCompile>
+    <ClCompile Include="Access\Vocab.cpp">
+      <Filter>Access</Filter>
+    </ClCompile>
+    <ClCompile Include="Access\Controls.cpp">
+      <Filter>Access</Filter>
+    </ClCompile>
+    <ClCompile Include="Access\Navigator.cpp">
+      <Filter>Access</Filter>
+    </ClCompile>
+    <ClCompile Include="Access\Screens.cpp">
+      <Filter>Access</Filter>
+    </ClCompile>
+    <ClCompile Include="Access\Battle.cpp">
+      <Filter>Access</Filter>
+    </ClCompile>
+    <ClCompile Include="Access\Dogfight.cpp">
+      <Filter>Access</Filter>
+    </ClCompile>
+    <ClCompile Include="Access\Geo.cpp">
+      <Filter>Access</Filter>
+    </ClCompile>
+    <ClCompile Include="Access\TerrainNames.cpp">
+      <Filter>Access</Filter>
+    </ClCompile>
+    <ClCompile Include="Access\Graph\GraphAnnouncer.cpp">
+      <Filter>Access\Graph</Filter>
+    </ClCompile>
+    <ClCompile Include="Access\Graph\GraphBuilder.cpp">
+      <Filter>Access\Graph</Filter>
+    </ClCompile>
+    <ClCompile Include="Access\Graph\KeyGraph.cpp">
+      <Filter>Access\Graph</Filter>
+    </ClCompile>
     <ClCompile Include="main.cpp" />
     <ClCompile Include="Basescape\MiniBaseView.cpp">
       <Filter>Basescape</Filter>
@@ -1231,6 +1267,48 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="Access\Speech.h">
+      <Filter>Access</Filter>
+    </ClInclude>
+    <ClInclude Include="Access\Vocab.h">
+      <Filter>Access</Filter>
+    </ClInclude>
+    <ClInclude Include="Access\Controls.h">
+      <Filter>Access</Filter>
+    </ClInclude>
+    <ClInclude Include="Access\Navigator.h">
+      <Filter>Access</Filter>
+    </ClInclude>
+    <ClInclude Include="Access\Screens.h">
+      <Filter>Access</Filter>
+    </ClInclude>
+    <ClInclude Include="Access\Battle.h">
+      <Filter>Access</Filter>
+    </ClInclude>
+    <ClInclude Include="Access\Dogfight.h">
+      <Filter>Access</Filter>
+    </ClInclude>
+    <ClInclude Include="Access\Geo.h">
+      <Filter>Access</Filter>
+    </ClInclude>
+    <ClInclude Include="Access\TerrainNames.h">
+      <Filter>Access</Filter>
+    </ClInclude>
+    <ClInclude Include="Access\Graph\ControlId.hpp">
+      <Filter>Access\Graph</Filter>
+    </ClInclude>
+    <ClInclude Include="Access\Graph\GraphAnnouncer.hpp">
+      <Filter>Access\Graph</Filter>
+    </ClInclude>
+    <ClInclude Include="Access\Graph\GraphBuilder.hpp">
+      <Filter>Access\Graph</Filter>
+    </ClInclude>
+    <ClInclude Include="Access\Graph\GraphTypes.hpp">
+      <Filter>Access\Graph</Filter>
+    </ClInclude>
+    <ClInclude Include="Access\Graph\KeyGraph.hpp">
+      <Filter>Access\Graph</Filter>
+    </ClInclude>
     <ClInclude Include="resource.h" />
     <ClInclude Include="Basescape\ManufactureState.h">
       <Filter>Basescape</Filter>
@@ -2716,6 +2794,12 @@
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
+    <Filter Include="Access">
+      <UniqueIdentifier>{5d3c8e1a-7b42-4f0e-9a6d-2c1b8f4e7a90}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Access\Graph">
+      <UniqueIdentifier>{b7e2c4d1-3f6a-4e8b-9c0d-1a2b3c4d5e6f}</UniqueIdentifier>
+    </Filter>
     <Filter Include="Geoscape">
       <UniqueIdentifier>{f0521223-4515-4155-bf25-5f00373167d5}</UniqueIdentifier>
     </Filter>

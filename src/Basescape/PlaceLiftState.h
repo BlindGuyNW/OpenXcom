@@ -57,6 +57,8 @@ public:
 	void viewClick(Action *action);
 	/// Handler for clicking the Access Lifts list.
 	void lstAccessLiftsClick(Action *action);
+	/// Gets the base view (accessibility).
+	BaseView *getView() const { return _view; }
 };
 
 }

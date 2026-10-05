@@ -311,4 +311,21 @@ void MedikitState::update()
 	_medikitView->invalidate();
 }
 
+
+/**
+ * Gets the unit using the medikit (accessibility layer).
+ */
+BattleUnit *MedikitState::getHealer() const
+{
+	return _action->actor;
+}
+
+/**
+ * Gets the time units each use costs (accessibility layer).
+ */
+int MedikitState::getTUCost() const
+{
+	return _action->Time;
+}
+
 }

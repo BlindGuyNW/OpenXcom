@@ -70,6 +70,12 @@ public:
 	void setValue(int value);
 	/// Gets the slider's value.
 	int getValue() const;
+	/// Gets the smallest value.
+	int getMin() const;
+	/// Gets the largest value.
+	int getMax() const;
+	/// Runs the change handler, the way dragging the slider does.
+	void notifyChange(State *state);
 	/// Blits the slider onto another surface.
 	void blit(SDL_Surface *surface) override;
 	/// Moves the slider.

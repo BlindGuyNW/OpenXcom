@@ -49,6 +49,8 @@ public:
 	void btnOkClick(Action *action);
 	/// Handler for clicking the New Research button.
 	void btnNewClick(Action *action);
+	/// Gets the base (for the accessibility layer).
+	Base *getBase() const { return _base; }
 	/// Handler for clicking the ResearchProject list.
 	void onSelectProject(Action *action);
 	void onOpenTechTreeViewer(Action *action);

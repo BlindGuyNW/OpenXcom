@@ -53,6 +53,8 @@ public:
 	void btnOkClick(Action *action);
 	/// Handler for clicking the Crafts list.
 	void lstCraftsClick(Action *action);
+	/// Gets the base whose craft are listed (for the accessibility layer).
+	Base *getBase() const { return _base; }
 };
 
 }

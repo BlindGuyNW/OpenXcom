@@ -17,6 +17,7 @@
  * along with OpenXcom.  If not, see <http://www.gnu.org/licenses/>.
  */
 #include "DogfightState.h"
+#include "../Access/Dogfight.h"
 #include <cmath>
 #include <sstream>
 #include "GeoscapeState.h"
@@ -1979,6 +1980,7 @@ void DogfightState::setStatus(const std::string &status)
 {
 	_txtStatus->setText(tr(status));
 	_timeout = 50;
+	Dogfight::status(this, status);
 }
 
 /**

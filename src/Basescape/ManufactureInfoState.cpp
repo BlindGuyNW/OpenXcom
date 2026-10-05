@@ -706,6 +706,77 @@ void ManufactureInfoState::minimumUnitClick(Action* action)
 }
 
 /**
+ * Adds or removes engineers, as the engineer arrows do (accessibility).
+ * @param sign Above 0 adds, otherwise removes.
+ * @param count How many; INT_MAX for as many as possible.
+ */
+void ManufactureInfoState::changeEngineers(int sign, int count)
+{
+	if (sign > 0)
+		moreEngineer(count);
+	else
+		lessEngineer(count);
+}
+
+/**
+ * Adds or removes units to produce, as the unit arrows' clicks do, with count in place of
+ * the scroll step (accessibility).
+ * @param sign Above 0 adds, otherwise removes.
+ * @param count How many; INT_MAX is the arrows' right click.
+ */
+void ManufactureInfoState::changeUnits(int sign, int count)
+{
+	if (sign > 0)
+	{
+		if (_production->getInfiniteAmount())
+			return;
+		if (count == INT_MAX && !_production->getRules()->getProducedCraft())
+		{
+			_production->setInfiniteAmount(true);
+			setAssignedEngineer();
+		}
+		else
+		{
+			moreUnit(count);
+		}
+		return;
+	}
+	bool wasInfinite = _production->getInfiniteAmount();
+	_production->setInfiniteAmount(false);
+	if (count == INT_MAX || _production->getAmountTotal() <= _production->getAmountProduced())
+	{
+		_production->setAmountTotal(_production->getAmountProduced() + 1);
+		setAssignedEngineer();
+	}
+	if (count == INT_MAX)
+		return;
+	if (wasInfinite)
+	{
+		// As lessUnitClick: from no limit, the most the funds and stores allow (capped at 999).
+		int productionPossible = 999;
+		auto* manufRule = _production->getRules();
+		if (manufRule->getManufactureCost() > 0)
+		{
+			int64_t byFunds = _game->getSavedGame()->getFunds() / manufRule->getManufactureCost();
+			if (byFunds < 1000LL)
+				productionPossible = std::min(productionPossible, (int)byFunds);
+		}
+		for (auto& item : manufRule->getRequiredItems())
+		{
+			productionPossible = std::min(productionPossible, _base->getStorageItems()->getItem(item.first) / item.second);
+		}
+		productionPossible = std::max(0, productionPossible);
+		int newTotal = _production->getAmountProduced() + productionPossible;
+		if (!_item)
+		{
+			newTotal += 1;
+		}
+		_production->setAmountTotal(newTotal + count);
+	}
+	lessUnit(count);
+}
+
+/**
  * Assigns one more engineer (if possible).
  */
 void ManufactureInfoState::onMoreEngineer()

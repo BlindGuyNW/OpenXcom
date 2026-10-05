@@ -54,6 +54,10 @@ public:
 	void handle(Action *action) override;
 	/// Handler for clicking a button.
 	void btnClick(Action *action);
+	/// Gets the button for a timer value, 0 to 23 (for the accessibility layer).
+	InteractiveSurface *getButton(int i) const { return _button[i]; }
+	/// Gets the title text.
+	Text *getTitle() const { return _title; }
 };
 
 }

@@ -44,6 +44,10 @@ private:
 	Text *_txtTitle;
 	TextButton *_btnCancel, *_btnCydonia;
 public:
+	/// Gets the lead craft being sent (accessibility layer).
+	Craft *getCraft() const { return _crafts.front(); }
+	/// Gets all the craft being sent together (accessibility layer).
+	const std::vector<Craft*> &getCrafts() const { return _crafts; }
 	/// Creates the Select Destination state.
 	SelectDestinationState(std::vector<Craft*> crafts, Globe *globe);
 	/// Cleans up the Select Destination state.

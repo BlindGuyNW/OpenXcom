@@ -41,7 +41,7 @@ private:
 	bool _highlighted;
 	BattleActionType _action;
 	const RuleSkill* _skill;
-	int _tu, _highlightModifier;
+	int _tu, _highlightModifier, _accuracy;
 	Frame *_frame;
 	Text *_txtDescription, *_txtAcc, *_txtTU;
 public:
@@ -58,6 +58,12 @@ public:
 	const RuleSkill* getSkill() const;
 	/// Gets the assigned action TUs.
 	int getTUs() const;
+	/// Sets the accuracy shown, -1 for none (for the accessibility layer).
+	void setAccuracy(int accuracy);
+	/// Gets the accuracy shown, -1 for none.
+	int getAccuracy() const;
+	/// Gets the action's description text.
+	std::string getDescription() const;
 	/// Sets the palettes.
 	void setPalette(const SDL_Color *colors, int firstcolor, int ncolors) override;
 	/// Redraws it.

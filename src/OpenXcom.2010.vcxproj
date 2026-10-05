@@ -330,6 +330,18 @@
     </Manifest>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="Access\Speech.cpp" />
+    <ClCompile Include="Access\Vocab.cpp" />
+    <ClCompile Include="Access\Controls.cpp" />
+    <ClCompile Include="Access\Navigator.cpp" />
+    <ClCompile Include="Access\Screens.cpp" />
+    <ClCompile Include="Access\Battle.cpp" />
+    <ClCompile Include="Access\Dogfight.cpp" />
+    <ClCompile Include="Access\Geo.cpp" />
+    <ClCompile Include="Access\TerrainNames.cpp" />
+    <ClCompile Include="Access\Graph\GraphAnnouncer.cpp" />
+    <ClCompile Include="Access\Graph\GraphBuilder.cpp" />
+    <ClCompile Include="Access\Graph\KeyGraph.cpp" />
     <ClCompile Include="..\libs\miniz\miniz.c" />
     <ClCompile Include="..\libs\rapidyaml\c4\base64.cpp" />
     <ClCompile Include="..\libs\rapidyaml\c4\char_traits.cpp" />
@@ -746,6 +758,20 @@
     <ClCompile Include="Ufopaedia\UfopaediaStartState.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="Access\Speech.h" />
+    <ClInclude Include="Access\Vocab.h" />
+    <ClInclude Include="Access\Controls.h" />
+    <ClInclude Include="Access\Navigator.h" />
+    <ClInclude Include="Access\Screens.h" />
+    <ClInclude Include="Access\Battle.h" />
+    <ClInclude Include="Access\Dogfight.h" />
+    <ClInclude Include="Access\Geo.h" />
+    <ClInclude Include="Access\TerrainNames.h" />
+    <ClInclude Include="Access\Graph\ControlId.hpp" />
+    <ClInclude Include="Access\Graph\GraphAnnouncer.hpp" />
+    <ClInclude Include="Access\Graph\GraphBuilder.hpp" />
+    <ClInclude Include="Access\Graph\GraphTypes.hpp" />
+    <ClInclude Include="Access\Graph\KeyGraph.hpp" />
     <ClInclude Include="..\libs\miniz\miniz.h" />
     <ClInclude Include="..\libs\rapidyaml\c4\allocator.hpp" />
     <ClInclude Include="..\libs\rapidyaml\c4\base64.hpp" />

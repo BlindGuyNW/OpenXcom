@@ -58,6 +58,12 @@ public:
 	void lstWeaponsClick(Action *action);
 	/// Handler for middle clicking the Weapons list.
 	void lstWeaponsMiddleClick(Action *action);
+	/// Gets the base (accessibility).
+	Base *getBase() const { return _base; }
+	/// Gets the craft (accessibility).
+	Craft *getCraft() const { return _craft; }
+	/// Gets the weapon slot being changed (accessibility).
+	size_t getSlot() const { return _weapon; }
 };
 
 }
