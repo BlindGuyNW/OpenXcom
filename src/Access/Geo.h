@@ -54,6 +54,9 @@ namespace Geo
 	std::string countryName(double lon, double lat);
 	/// Where a point is, for speech: its country, else its region. Empty over open sea outside every region.
 	std::string placeName(double lon, double lat);
+	/// "over sea" when the globe shows water at a point (Globe::insideLand, the test the
+	/// game uses to sink a downed UFO instead of leaving a crash site), else empty.
+	std::string seaText(double lon, double lat);
 	/// Distance and compass bearing from one target to a point: "1,230 nautical miles northeast".
 	std::string offsetText(const Target *from, double lon, double lat);
 }

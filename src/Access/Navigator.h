@@ -49,6 +49,10 @@ namespace Navigator
 	bool handleEvent(Game *game, const SDL_Event &ev);
 	/// Per-frame tick: attaches to the top state's screen and announces focus changes.
 	void update(Game *game);
+	/// The modifiers held with the key being handled, KMOD_NONE outside a key-down.
+	/// The game doesn't see them while the layer acts (see handleEvent); a recipe that
+	/// wants OXCE's Shift or Ctrl variant hands them over with Controls::withModifiers.
+	SDLMod keyModifiers();
 	/// Moves a state's cursor to a node, for when the game opens something new on the same state.
 	/// Takes effect on the next rebuild; the differ announces it.
 	void focus(State *state, const Graph::ControlId &id);

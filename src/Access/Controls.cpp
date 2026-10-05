@@ -18,6 +18,7 @@
  */
 #include "Controls.h"
 #include <algorithm>
+#include "Speech.h"
 #include "Vocab.h"
 #include "../Engine/Action.h"
 #include "../Engine/InteractiveSurface.h"
@@ -84,10 +85,26 @@ const ControlType &editType()
 
 namespace
 {
+	/// Set when the last drive was refused; the navigator then skips its state feedback.
+	bool _refused = false;
+
+	/// The game ignores input to a hidden surface (InteractiveSurface::handle), and OXCE hides
+	/// buttons to forbid their action, so we refuse the same, out loud.
+	bool usable(Surface *surface)
+	{
+		if (surface->getVisible() && !surface->getHidden())
+			return true;
+		Speech::say(Vocab::get(Vocab::UNAVAILABLE), true);
+		_refused = true;
+		return false;
+	}
+
 	/// A synthetic click at a screen point, so handlers that read the
 	/// button or the mouse position see what a real click would give them.
-	void clickAt(State *state, InteractiveSurface *surface, Uint8 mouseButton, int x, int y)
+	bool clickAt(State *state, InteractiveSurface *surface, Uint8 mouseButton, int x, int y)
 	{
+		if (!usable(surface))
+			return false;
 		SDL_Event ev = {};
 		ev.type = SDL_MOUSEBUTTONUP;
 		ev.button.button = mouseButton;
@@ -99,18 +116,39 @@ namespace
 		surface->mousePress(&action, state);
 		surface->mouseRelease(&action, state);
 		surface->mouseClick(&action, state);
+		return true;
 	}
 }
 
-void click(State *state, InteractiveSurface *surface, Uint8 mouseButton)
+void withModifiers(SDLMod mod, const std::function<void()> &fn)
 {
-	clickAt(state, surface, mouseButton, surface->getX() + surface->getWidth() / 2, surface->getY() + surface->getHeight() / 2);
+	struct Restore
+	{
+		SDLMod before;
+		~Restore() { SDL_SetModState(before); }
+	} restore{ SDL_GetModState() };
+	SDL_SetModState(mod);
+	fn();
 }
 
-void clickRow(State *state, TextList *list, size_t row, Uint8 mouseButton)
+bool takeRefusal()
 {
+	bool refused = _refused;
+	_refused = false;
+	return refused;
+}
+
+bool click(State *state, InteractiveSurface *surface, Uint8 mouseButton)
+{
+	return clickAt(state, surface, mouseButton, surface->getX() + surface->getWidth() / 2, surface->getY() + surface->getHeight() / 2);
+}
+
+bool clickRow(State *state, TextList *list, size_t row, Uint8 mouseButton)
+{
+	if (!usable(list))
+		return false;
 	list->setSelectedRow(row);
-	clickAt(state, list, mouseButton, list->getX() + 2, list->getY() + 2);
+	return clickAt(state, list, mouseButton, list->getX() + 2, list->getY() + 2);
 }
 
 std::string cellText(TextList *list, size_t row, size_t column)
@@ -235,7 +273,7 @@ NodeVtable comboBox(State *state, ComboBox *box, const std::string &label)
 		if (count == 0)
 			return;
 		int sel = std::max(0, std::min(count - 1, (int)box->getSelected() + sign * (large ? LARGE_STEP : 1)));
-		if (sel == (int)box->getSelected())
+		if (sel == (int)box->getSelected() || !usable(box))
 			return;
 		box->setSelected(sel);
 		box->notifyChange(state);
@@ -253,7 +291,7 @@ NodeVtable slider(State *state, Slider *slider, const std::string &label)
 	v.OnAdjust = [state, slider](int sign, bool large)
 	{
 		int value = std::max(slider->getMin(), std::min(slider->getMax(), slider->getValue() + sign * (large ? LARGE_STEP : 1)));
-		if (value == slider->getValue())
+		if (value == slider->getValue() || !usable(slider))
 			return;
 		slider->setValue(value);
 		slider->notifyChange(state);

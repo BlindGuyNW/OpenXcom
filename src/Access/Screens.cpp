@@ -22,6 +22,7 @@
 #include <climits>
 #include <cstdlib>
 #include <map>
+#include <memory>
 #include <tuple>
 #include "../Engine/State.h"
 #include "../Interface/ArrowButton.h"
@@ -2014,8 +2015,16 @@ std::string launchRefusal(State *state, Craft *c)
 	return Vocab::format(Vocab::CANT_LAUNCH, { reason });
 }
 
+bool inWing(InterceptState *ic, Craft *c)
+{
+	const std::vector<Craft *> &wing = ic->getSelectedCrafts();
+	return std::find(wing.begin(), wing.end(), c) != wing.end();
+}
+
 /// Launch interception: one row per craft from the state's own craft list; Enter launches,
 /// or says why not. Backspace (right click) centres the globe on a craft in flight, as the game does.
+/// Shift+Enter is OXCE's Shift+click: puts the craft in the wing or takes it out
+/// (InterceptState::lstCraftsLeftClick, at most 3); then Enter on any craft launches it with the wing.
 AccessScreen intercept()
 {
 	AccessScreen s = simpleScreen("intercept", is<InterceptState>);
@@ -2023,15 +2032,46 @@ AccessScreen intercept()
 	s.build = [](GraphBuilder &b, State *state)
 	{
 		InterceptState *ic = static_cast<InterceptState *>(state);
-		addWidgets(b, state, [state, ic](Surface *, size_t row, NodeVtable &v)
+		addWidgets(b, state, [state, ic](Surface *surface, size_t row, NodeVtable &v)
 		{
 			if (row == NO_ROW || row >= ic->getCrafts().size())
 				return;
+			TextList *list = static_cast<TextList *>(surface);
 			Craft *c = ic->getCrafts()[row];
 			v.Announcements.clear();
-			v.Announcements.push_back(NodeAnnouncement([state, c] { return interceptRow(state, c); }, false, AnnouncementKinds::Label));
-			// Only heard if the screen is still up after Enter, which is exactly a refusal.
-			v.StateText = [state, c] { return launchRefusal(state, c); };
+			v.Announcements.push_back(NodeAnnouncement([state, ic, c]
+			{
+				std::string text = interceptRow(state, c);
+				return inWing(ic, c) ? text + ", " + Vocab::get(Vocab::IN_WING) : text;
+			}, false, AnnouncementKinds::Label));
+			// What the last Shift+Enter did to the wing; empty after a plain Enter.
+			std::shared_ptr<std::string> wingChange = std::make_shared<std::string>();
+			v.OnActivate = [state, ic, list, row, c, wingChange]
+			{
+				wingChange->clear();
+				bool before = inWing(ic, c);
+				if (Navigator::keyModifiers() & KMOD_SHIFT)
+				{
+					Controls::withModifiers(KMOD_LSHIFT, [&] { Controls::clickRow(state, list, row); });
+					bool after = inWing(ic, c);
+					std::string count = std::to_string(ic->getSelectedCrafts().size());
+					if (after != before)
+						*wingChange = Vocab::format(after ? Vocab::WING_ADDED : Vocab::WING_REMOVED, { count });
+					else
+					{
+						std::string refusal = launchRefusal(state, c);
+						*wingChange = refusal.empty() ? Vocab::format(Vocab::WING_FULL, { count }) : refusal;
+					}
+					return;
+				}
+				// The game adds this craft to the wing and launches them all.
+				size_t total = ic->getSelectedCrafts().size() + (before ? 0 : 1);
+				if (total > 1 && launchRefusal(state, c).empty())
+					Speech::say(Vocab::format(Vocab::WING_LAUNCH, { std::to_string(total) }), true);
+				Controls::clickRow(state, list, row);
+			};
+			// A plain Enter is only heard if the screen is still up after it, which is exactly a refusal.
+			v.StateText = [state, c, wingChange] { return wingChange->empty() ? launchRefusal(state, c) : *wingChange; };
 		});
 	};
 	return s;
@@ -2041,7 +2081,7 @@ AccessScreen intercept()
 /// inside the range circle the globe draws (half the craft's fuel, so it can get home).
 std::string destinationText(Craft *craft, const std::string &name, double lon, double lat)
 {
-	std::vector<std::string> parts = { name, Geo::placeName(lon, lat), Geo::offsetText(craft, lon, lat),
+	std::vector<std::string> parts = { name, Geo::placeName(lon, lat), Geo::seaText(lon, lat), Geo::offsetText(craft, lon, lat),
 		Vocab::get(craft->getDistance(lon, lat) <= craft->getBaseRange() ? Vocab::DF_IN_RANGE : Vocab::DF_OUT_OF_RANGE) };
 	std::string s;
 	for (const std::string &p : parts)

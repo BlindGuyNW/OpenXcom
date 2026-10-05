@@ -93,6 +93,8 @@ namespace
 	bool _zeroPending = false;
 	/// The projectile in flight last frame, so each new shot is spoken once.
 	Projectile *_projectile = 0;
+	/// The current shot hasn't been seen yet: it's spoken when it first comes into view, or never.
+	bool _shotPending = false;
 	/// The last shot spoken, so an auto shot's bursts aren't repeated.
 	Position _shotFrom, _shotAt;
 	Uint32 _shotTime = 0;
@@ -1086,10 +1088,11 @@ namespace
 		return joinComma(parts);
 	}
 
-	/// A shot or throw the player didn't order just left (an alien's, or our reaction fire):
-	/// say who fired if we can see them, else the direction it came from
-	/// (a sighted player sees the projectile fly in).
-	void narrateShot(BattlescapeState *state, Projectile *projectile)
+	/// A shot or throw the player didn't order (an alien's, or our reaction fire) has come into view:
+	/// say who fired if we can see them; else, from where it was first seen (seenAt, a tile),
+	/// the direction it came in from if it's aimed at someone shown, or where it was seen and
+	/// which way it was heading. Never the hidden shooter's position.
+	void narrateShot(BattlescapeState *state, Projectile *projectile, Position seenAt)
 	{
 		SavedBattleGame *save = saveOf(state);
 		// The origin is where the trajectory starts, often the tile next to the shooter, so it's only good for a bearing.
@@ -1118,10 +1121,21 @@ namespace
 			say(target ? Vocab::format(Vocab::UNIT_FIRES_AT, { name, unitLabel(target) }) : Vocab::format(Vocab::UNIT_FIRES, { name }), false);
 			return;
 		}
-		std::string bearing = bearingText(at, from);
-		if (bearing.empty())
+		if (target)
+		{
+			// Where it came into view; if that's the target's own tile, the way it travelled.
+			std::string bearing = bearingText(at, seenAt);
+			if (bearing.empty())
+				bearing = bearingText(at, from);
+			say(bearing.empty() ? Vocab::format(Vocab::UNIT_FIRES_AT, { Vocab::get(Vocab::SHOT_UNSEEN_SHOOTER), unitLabel(target) })
+				: Vocab::format(Vocab::FIRE_FROM_AT, { bearing, unitLabel(target) }), false);
 			return;
-		say(target ? Vocab::format(Vocab::FIRE_FROM_AT, { bearing, unitLabel(target) }) : Vocab::format(Vocab::FIRE_FROM, { bearing }), false);
+		}
+		std::string heading = bearingText(Position(from.x, from.y, 0), Position(at.x, at.y, 0));
+		std::string text = Vocab::format(Vocab::SHOT_SEEN, { offsetText(anchor(), seenAt) });
+		if (!heading.empty())
+			text += ", " + Vocab::format(Vocab::SHOT_HEADING, { heading });
+		say(text, false);
 	}
 
 	void reset(SavedBattleGame *save)
@@ -1134,6 +1148,7 @@ namespace
 		_health.clear();
 		_wasTargeting = false;
 		_projectile = 0;
+		_shotPending = false;
 		_shotTime = 0;
 		_reportShot = false;
 		_before.clear();
@@ -1359,7 +1374,22 @@ void update(BattlescapeState *state)
 		BattleUnit *shooter = projectile->getActor();
 		Tile *targetTile = save->getTile(projectile->getTarget());
 		_reportShot = (shooter && shooter->getFaction() == FACTION_PLAYER) || unitShown(shooter) || (targetTile && unitShown(targetTile->getUnit()));
-		narrateShot(state, projectile);
+		_shotPending = true;
+	}
+	if (!projectile)
+		_shotPending = false;
+	if (_shotPending)
+	{
+		// What the Map draws (Map.cpp, _projectileInFOV): on our turn every shot; on the aliens'
+		// turn a shot only while it's on a tile we can see, else the hidden movement screen.
+		// A visible shooter counts from the start: the screen shows it firing.
+		Position now = projectile->getPosition().toTile();
+		Tile *tile = save->getTile(now);
+		if (save->getSide() == FACTION_PLAYER || unitShown(projectile->getActor()) || (tile && tile->getVisible()))
+		{
+			_shotPending = false;
+			narrateShot(state, projectile, now);
+		}
 	}
 	_projectile = projectile;
 

@@ -51,7 +51,17 @@ using namespace Graph;
 
 namespace
 {
+	/// Clears SDL's modifier state for its lifetime and puts it back after.
+	struct ModifierMask
+	{
+		SDLMod held;
+		ModifierMask() : held(SDL_GetModState()) { SDL_SetModState(KMOD_NONE); }
+		~ModifierMask() { SDL_SetModState(held); }
+	};
+
 	Game *_game = 0;
+	/// The modifiers of the key-down being handled.
+	SDLMod _keyMod = KMOD_NONE;
 	/// The attached recipe and the state it's attached to; null when no recipe matches the top state.
 	const AccessScreen *_screen = 0;
 	State *_state = 0;
@@ -186,6 +196,8 @@ namespace
 	/// The focused control's state line after an activation or adjust (spec 7.5).
 	void stateFeedback()
 	{
+		if (Controls::takeRefusal())
+			return;
 		if (!_graph || topState() != _state || !_graph->Rerender())
 			return;
 		GraphNode *node = _graph->CurrentNode();
@@ -420,6 +432,14 @@ bool handleEvent(Game *game, const SDL_Event &ev)
 
 	SDLMod mod = ev.key.keysym.mod;
 	bool shift = (mod & KMOD_SHIFT) != 0, ctrl = (mod & KMOD_CTRL) != 0, alt = (mod & KMOD_ALT) != 0;
+	Controls::takeRefusal();
+	// OXCE's handlers read the live modifier state (Game::isShiftPressed and friends), so a
+	// handler we drive would see the Shift or Ctrl held for our own key: Shift+Left on a sort
+	// combo reverses the soldier list, Shift+Enter on Intercept builds a wing. Our keys read
+	// their modifiers from the event, so hide them from the game while we act. A key we
+	// don't claim reaches the game after this returns, with the real state back.
+	ModifierMask mask;
+	_keyMod = mod;
 
 	bool claimed = false;
 	if (ctrl && !alt && !shift && key == SDLK_r)
@@ -451,7 +471,13 @@ bool handleEvent(Game *game, const SDL_Event &ev)
 	}
 	if (claimed)
 		_swallowed.insert(key);
+	_keyMod = KMOD_NONE;
 	return claimed;
+}
+
+SDLMod keyModifiers()
+{
+	return _keyMod;
 }
 
 void focus(State *state, const ControlId &id)

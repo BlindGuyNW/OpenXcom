@@ -273,6 +273,17 @@ namespace
 		"Z to A",
 		"oldest first",
 		"newest first",
+		"unavailable",
+		"added to wing, {0} in wing",
+		"removed from wing, {0} in wing",
+		"wing full, {0} in wing",
+		"in wing",
+		"launching {0} craft",
+		"over sea",
+		"{0} lost at sea, no crash site",
+		"shot seen {0}",
+		"heading {0}",
+		"unseen shooter",
 	};
 }
 

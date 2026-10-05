@@ -22,6 +22,7 @@
 #include <map>
 #include <vector>
 #include "Controls.h"
+#include "Geo.h"
 #include "Navigator.h"
 #include "Speech.h"
 #include "Vocab.h"
@@ -53,6 +54,8 @@ namespace
 	{
 		std::string craft;
 		bool open;
+		/// The window said the UFO crash-landed; whether it sank is only known afterwards.
+		bool crashed = false;
 		int ammo[RuleCraft::WeaponMax] = {};
 		bool inRange[RuleCraft::WeaponMax] = {};
 	};
@@ -173,8 +176,11 @@ namespace
 
 			b.AddItem(ControlId::Referenced(d, key + "info"), textNode([d]
 			{
+				// Over sea, a downed UFO sinks: no crash site, no mission (DogfightState::update).
+				std::string sea = Geo::seaText(d->getUfo()->getLongitude(), d->getUfo()->getLatitude());
 				return Vocab::format(Vocab::DF_DISTANCE, { std::to_string(d->getCurrentDistance()) }) + ", " +
-					Vocab::format(Vocab::DF_DAMAGE, { std::to_string(d->getCraft()->getDamagePercentage()) });
+					Vocab::format(Vocab::DF_DAMAGE, { std::to_string(d->getCraft()->getDamagePercentage()) }) +
+					(sea.empty() ? "" : ", " + sea);
 			}));
 
 			std::vector<ImageButton *> modes = d->getModeButtons();
@@ -260,7 +266,8 @@ void update(GeoscapeState *geo)
 			_watch[d] = w;
 			if (open)
 			{
-				narrate(d, Vocab::format(Vocab::DF_START, { w.craft, d->getUfo()->getName(lang()) }));
+				// Not narrate(): the line names its craft already, so no prefix.
+				Speech::say(Vocab::format(Vocab::DF_START, { w.craft, d->getUfo()->getName(lang()) }), false);
 				// A new window starts at its top, not wherever the last one was left.
 				Navigator::focus(geo, ControlId::Referenced(d, keyFor(d) + "info"));
 			}
@@ -270,6 +277,15 @@ void update(GeoscapeState *geo)
 		Watch now = w;
 		snapshot(d, now);
 		w.open = open;
+		// The game says "crash lands" first, then sets the UFO destroyed if it came down on water
+		// (DogfightState.cpp, the shot-down branch); the globe then shows no crash site.
+		// The window holds its UFO until it closes, so reading it here is safe.
+		if (w.crashed && d->getUfo()->getStatus() == Ufo::DESTROYED)
+		{
+			w.crashed = false;
+			if (open)
+				narrate(d, Vocab::format(Vocab::LOST_AT_SEA, { d->getUfo()->getName(lang()) }));
+		}
 		if (open)
 		{
 			for (int i = 0; i < d->getWeaponCount(); ++i)
@@ -296,6 +312,12 @@ void status(DogfightState *d, const std::string &id)
 	std::string &last = _lastStatus[d];
 	bool repeat = id == last && id == "STR_UFO_OUTRUNNING_INTERCEPTOR";
 	last = id;
+	if (id == "STR_UFO_CRASH_LANDS")
+	{
+		std::map<DogfightState *, Watch>::iterator it = _watch.find(d);
+		if (it != _watch.end())
+			it->second.crashed = true;
+	}
 	// A minimized window shows nothing, so says nothing.
 	if (repeat || d->isMinimized())
 		return;

@@ -28,6 +28,7 @@
 #include "../Engine/State.h"
 #include "../Engine/Unicode.h"
 #include "../Geoscape/GeoscapeState.h"
+#include "../Geoscape/Globe.h"
 #include "../Geoscape/MultipleTargetsState.h"
 #include "../Interface/TextButton.h"
 #include "../Mod/RuleCountry.h"
@@ -156,7 +157,8 @@ namespace
 	{
 		const Base *home = homeBase();
 		std::string offset = home ? offsetText(home, t->getLongitude(), t->getLatitude()) : std::string();
-		return joinComma({ t->getName(game()->getLanguage()), placeName(t->getLongitude(), t->getLatitude()), offset });
+		return joinComma({ t->getName(game()->getLanguage()), placeName(t->getLongitude(), t->getLatitude()),
+			seaText(t->getLongitude(), t->getLatitude()), offset });
 	}
 
 	void scanStep(int step)
@@ -273,6 +275,17 @@ std::string placeName(double lon, double lat)
 	{
 		if (r->getRules()->insideRegion(lon, lat))
 			return tr(r->getRules()->getType());
+	}
+	return "";
+}
+
+std::string seaText(double lon, double lat)
+{
+	// The Geoscape sits under every campaign screen, so its globe is always on the stack.
+	for (State *s : game()->getStates())
+	{
+		if (GeoscapeState *geo = dynamic_cast<GeoscapeState *>(s))
+			return geo->getGlobe()->insideLand(lon, lat) ? std::string() : Vocab::get(Vocab::OVER_SEA);
 	}
 	return "";
 }

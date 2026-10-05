@@ -53,10 +53,19 @@ namespace Controls
 	const Graph::ControlType &editType();
 	/// Clicks a surface the way the mouse would: press, release, click.
 	/// Runs the surface's own handlers, so sounds and side effects match a real click.
-	void click(State *state, InteractiveSurface *surface, Uint8 mouseButton = SDL_BUTTON_LEFT);
+	/// A hidden surface (the game ignores clicks on those) is refused with "unavailable";
+	/// returns whether the click went through. Combo boxes and sliders refuse the same way.
+	bool click(State *state, InteractiveSurface *surface, Uint8 mouseButton = SDL_BUTTON_LEFT);
 	/// Clicks a list row: selects it as hovering would, then clicks near the row's left edge,
 	/// clear of any arrow column, so the state's handlers see that row.
-	void clickRow(State *state, TextList *list, size_t row, Uint8 mouseButton = SDL_BUTTON_LEFT);
+	bool clickRow(State *state, TextList *list, size_t row, Uint8 mouseButton = SDL_BUTTON_LEFT);
+	/// Runs fn with the game seeing these modifiers held (Game::isShiftPressed and friends),
+	/// for the OXCE Shift/Ctrl variants a recipe wants on purpose. The navigator hides the
+	/// real ones while the layer acts; this puts back only what's asked for, for this call.
+	void withModifiers(SDLMod mod, const std::function<void()> &fn);
+	/// Whether a drive was refused since the last call; clears it. The navigator skips
+	/// its state feedback then, so "unavailable" isn't talked over.
+	bool takeRefusal();
 	/// A cell's text without the dot leaders a dotted list pads its cells with.
 	std::string cellText(TextList *list, size_t row, size_t column);
 	/// A row's cells joined into one line.

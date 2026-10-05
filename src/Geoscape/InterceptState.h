@@ -51,6 +51,8 @@ private:
 public:
 	/// Gets the crafts in list order.
 	const std::vector<Craft*> &getCrafts() const { return _crafts; }
+	/// Gets the crafts Shift+clicked into the wing so far.
+	const std::vector<Craft*> &getSelectedCrafts() const { return _selCrafts; }
 	/// Creates the Intercept state.
 	InterceptState(Globe *globe, bool useCustomSound, Base *base = 0, Target *target = 0);
 	/// Cleans up the Intercept state.
