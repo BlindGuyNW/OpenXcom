@@ -123,7 +123,8 @@ Next up, in order (agreed after the first full playtest):
 3. End of mission: abort-mission confirmation (in, untested). Debriefing is in. Note the battle ends when you end the turn after the last alien dies (`Options::battleAutoEnd` is off; leave options for later).
 4. ~~Medikit screen~~ (in; not yet: saying when a unit is revived); ~~Blaster Launcher waypoints and launch button~~ (in, untested).
 5. Small: ~~"1 time units" grammar~~ (`Vocab::format` drops the s after a 1), Ctrl+Enter quick move in the inventory, unit stats screen.
-6. Terrain names are labelled by eye (agents flagged uncertain ones: e.g. DESERT snakes and skulls are real decals, URBAN 81 "petrol pump", XBASE2 33 to 52 "machinery"); fix names as the user reports them.
+6. Parked polish (asked about 2026-10-05, deferred): when aiming a throw, say the item's blast radius (`RuleItem::getExplosionRadius`: HE power/20, so a grenade is 2) and maybe the visible units inside it. Not shown anywhere in the game; sighted players learn it by experience or wikis. Also parked: saying a unit is large (2x2) and which quarter the cursor is on.
+7. Terrain names are labelled by eye (agents flagged uncertain ones: e.g. DESERT snakes and skulls are real decals, URBAN 81 "petrol pump", XBASE2 33 to 52 "machinery"); fix names as the user reports them.
 
 ## Git
 
