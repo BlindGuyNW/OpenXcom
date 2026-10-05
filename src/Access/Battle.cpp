@@ -71,7 +71,6 @@ namespace
 	/// Our units' health last frame, to say when one is hit.
 	std::map<BattleUnit *, int> _health;
 	/// The floor named at the cursor's last step.
-	std::string _lastFloor;
 	/// Was the game waiting for a target last frame?
 	bool _wasTargeting = false;
 	/// The selected soldier's stance last frame.
@@ -353,8 +352,8 @@ namespace
 		return joinComma(parts);
 	}
 
-	/// The tile's own contents: object, floor, smoke and fire.
-	std::vector<std::string> terrainParts(SavedBattleGame *save, Tile *tile, Position p, bool full, bool withFloor)
+	/// The tile's own contents: object, lift, craft or exit area, smoke and fire. The floor is named last, by describeTile.
+	std::vector<std::string> terrainParts(SavedBattleGame *save, Tile *tile, Position p, bool full)
 	{
 		std::vector<std::string> parts;
 		MapData *object = tile->getMapData(O_OBJECT);
@@ -385,12 +384,6 @@ namespace
 			}
 		}
 		MapData *floor = tile->getMapData(O_FLOOR);
-		if (withFloor)
-		{
-			std::string floorName = TerrainNames::get(floor);
-			if (!floorName.empty())
-				parts.push_back(floorName);
-		}
 		if (floor && floor->isGravLift())
 			parts.push_back(Vocab::get(Vocab::LIFT));
 		if (floor && floor->getSpecialType() == START_POINT)
@@ -417,29 +410,11 @@ namespace
 		}
 	}
 
-	/// The ground a tile's description talks about: the tile itself, or where you'd land from open air.
-	Position groundOf(SavedBattleGame *save, Position p)
-	{
-		Tile *tile = save->getTile(p);
-		if (tile && p.z > 0 && tile->hasNoFloor(save->getTile(p + Position(0, 0, -1))))
-			return settleDown(save, p);
-		return p;
-	}
-
-	/// The name of the floor under p (or below it, from open air), for the floor differ.
-	std::string floorName(SavedBattleGame *save, Position p)
-	{
-		Tile *tile = save->getTile(groundOf(save, p));
-		if (!tile || !tile->isDiscovered(2))
-			return std::string();
-		return TerrainNames::get(tile->getMapData(O_FLOOR));
-	}
-
 	/// What a sighted player sees on a tile. Brief is for cursor steps, full for Ctrl+L.
-	/// The floor is named only with withFloor (always in full), since every tile has one.
-	std::string describeTile(BattlescapeState *state, Position p, bool full, bool withFloor = false)
+	/// The floor comes last, after the edges, so a tile reads the same whichever way the cursor arrives
+	/// and a quick next keypress cuts off the least useful part.
+	std::string describeTile(BattlescapeState *state, Position p, bool full)
 	{
-		withFloor = withFloor || full;
 		SavedBattleGame *save = saveOf(state);
 		Tile *tile = save->getTile(p);
 		if (!tile)
@@ -459,9 +434,10 @@ namespace
 		if (items->size() > shown)
 			parts.push_back(Vocab::format(Vocab::MORE_ITEMS, { num((int)(items->size() - shown)) }));
 
-		for (const std::string &s : terrainParts(save, tile, p, full, withFloor))
+		for (const std::string &s : terrainParts(save, tile, p, full))
 			parts.push_back(s);
 		parts.push_back(edgesText(save, tile, p));
+		parts.push_back(TerrainNames::get(tile->getMapData(O_FLOOR)));
 
 		// Open air: say what you'd land on, so the cursor can stay on the level you picked.
 		bool openAir = p.z > 0 && tile->hasNoFloor(save->getTile(p + Position(0, 0, -1)));
@@ -478,7 +454,7 @@ namespace
 		{
 			Position ground = settleDown(save, p);
 			if (ground.z < p.z)
-				parts.push_back(Vocab::format(Vocab::NO_FLOOR_BELOW, { num(p.z - ground.z), describeTile(state, ground, full, withFloor) }));
+				parts.push_back(Vocab::format(Vocab::NO_FLOOR_BELOW, { num(p.z - ground.z), describeTile(state, ground, full) }));
 			else
 				parts.push_back(Vocab::get(Vocab::NO_FLOOR));
 		}
@@ -633,11 +609,7 @@ namespace
 		}
 		_cursor = to;
 		showCursor(state);
-		// Name the floor only when it changes, so a field isn't "grass" at every step.
-		std::string floor = floorName(saveOf(state), _cursor);
-		bool newFloor = floor != _lastFloor;
-		_lastFloor = floor;
-		std::string text = describeTile(state, _cursor, false, newFloor);
+		std::string text = describeTile(state, _cursor, false);
 		if (levelChange)
 			text = Vocab::format(Vocab::LEVEL, { num(_cursor.z + 1) }) + ", " + text;
 		text = joinComma({ text, targetText(state, _cursor) });
@@ -1110,7 +1082,6 @@ namespace
 		_scanCurrent.tag = -1;
 		_awaiting = false;
 		_endTurnArmed = 0;
-		_lastFloor.clear();
 		_reserve = save->getTUReserved();
 		_kneelReserve = save->getKneelReserved();
 		_zeroPending = false;
