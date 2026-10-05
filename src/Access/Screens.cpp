@@ -120,6 +120,10 @@
 #include "../Battlescape/BattlescapeGame.h"
 #include "../Battlescape/BriefingState.h"
 #include "../Battlescape/DebriefingState.h"
+#include "../Battlescape/PromotionsState.h"
+#include "../Battlescape/CommendationState.h"
+#include "../Battlescape/CommendationLateState.h"
+#include "../Battlescape/CannotReequipState.h"
 #include "../Battlescape/PrimeGrenadeState.h"
 #include "../Battlescape/MedikitState.h"
 #include "../Battlescape/MedikitView.h"
@@ -1540,6 +1544,36 @@ AccessScreen tableScreen(const std::string &key, std::function<bool(State *)> is
 	return s;
 }
 
+/// A popup holding one short table: says its title and every row with its columns named on arrival,
+/// then lists the rows and buttons like tableScreen.
+AccessScreen tablePopup(const std::string &key, std::function<bool(State *)> isActive, const std::vector<std::string> &headers)
+{
+	AccessScreen s = tableScreen(key, isActive, headers);
+	s.name = [headers](State *state)
+	{
+		std::string result = firstText(state);
+		if (!result.empty())
+			result += ".";
+		for (Surface *surface : state->getSurfaces())
+		{
+			TextList *list = dynamic_cast<TextList *>(surface);
+			if (!list || !list->getVisible())
+				continue;
+			for (size_t row = 0; row < list->getTexts(); ++row)
+			{
+				std::string line = headedRow(state, list, row, headers);
+				if (line.empty())
+					continue;
+				if (!result.empty())
+					result += " ";
+				result += line + ".";
+			}
+		}
+		return result;
+	};
+	return s;
+}
+
 /// "5:7" as the base info screen writes its counts, said "5 of 7".
 std::string ofText(const std::string &value)
 {
@@ -1774,6 +1808,10 @@ const std::vector<AccessScreen> &all()
 		simpleScreen("soldierArmor", is<SoldierArmorState>),
 		soldierInfo(),
 		actionMenu(), primeGrenade(), medikit(), debriefing(),
+		tablePopup("promotions", is<PromotionsState>, { "STR_NEW_RANK", "STR_BASE" }),
+		popupScreen("commendations", is<CommendationState>),
+		popupScreen("commendationsLate", is<CommendationLateState>),
+		tablePopup("cannotReequip", is<CannotReequipState>, { "STR_QUANTITY_UC", "STR_CRAFT" }),
 		simpleScreen("pause", is<PauseState>),
 		simpleScreen("abandonGame", is<AbandonGameState>),
 		simpleScreen("abortMission", is<AbortMissionState>),

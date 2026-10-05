@@ -81,14 +81,19 @@ namespace
 		"{0}, {1} of {2} time units, health {3} of {4}, energy {5} of {6}, morale {7}",
 		"kneeling",
 		"standing",
+		"all time units spent",
 		"facing {0}",
 		"left hand {0}",
 		"right hand {0}",
 		"empty",
 		"{0}, {1} rounds",
 		"{0}, no ammo",
-		"{0} time units, {1} left. Enter again to move.",
-		"{0} time units, you have {1}. Enter again to move as far as you can.",
+		"{0} time units, {1} left, {2}. Enter again to move.",
+		"{0} time units, you have {1}, {2}. Enter again to move as far as you can.",
+		"{0} steps",
+		"1 step",
+		"the long way round",
+		"eats into reserved time units",
 		"No path",
 		"Not now",
 		"Cancelled",
@@ -112,6 +117,12 @@ namespace
 		"{0}, choose a target",
 		"in view",
 		"out of view",
+		"not facing it",
+		"too far",
+		"too dark",
+		"blocked",
+		"blocked by {0}",
+		"smoke in the way",
 		"friendly",
 		"{0} killed",
 		"{0} unconscious",
@@ -233,6 +244,10 @@ std::string format(Id id, const std::vector<std::string> &args)
 		std::string token = "{" + std::to_string(i) + "}";
 		for (size_t pos = s.find(token); pos != std::string::npos; pos = s.find(token, pos + args[i].size()))
 		{
+			// "1 time unit", not "1 time units". Only right after the number, so "1 of 59 time units" stays.
+			static const std::string units = " time units";
+			if (args[i] == "1" && s.compare(pos + token.size(), units.size(), units) == 0)
+				s.erase(pos + token.size() + units.size() - 1, 1);
 			s.replace(pos, token.size(), args[i]);
 		}
 	}

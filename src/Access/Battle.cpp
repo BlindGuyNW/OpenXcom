@@ -46,6 +46,7 @@
 #include "../Savegame/BattleItem.h"
 #include "../Savegame/BattleUnit.h"
 #include "../Savegame/SavedBattleGame.h"
+#include "../Savegame/SavedGame.h"
 #include "../Savegame/Tile.h"
 
 namespace OpenXcom
@@ -75,6 +76,11 @@ namespace
 	bool _wasTargeting = false;
 	/// The selected soldier's stance last frame.
 	bool _kneeled = false;
+	/// The reserve settings last frame (F1 to F4, J).
+	BattleActionType _reserve = BA_NONE;
+	bool _kneelReserve = false;
+	/// Delete was pressed; say the result once the game has handled it.
+	bool _zeroPending = false;
 	/// The projectile in flight last frame, so each new shot is spoken once.
 	Projectile *_projectile = 0;
 	/// The last shot spoken, so an auto shot's bursts aren't repeated.
@@ -206,9 +212,17 @@ namespace
 		return joinComma({ unitLabel(unit), facingText(unit) });
 	}
 
+	/// An item's name as the inventory shows it: unresearched alien items are just "Alien Artifact".
+	std::string itemName(BattlescapeState *state, BattleItem *item)
+	{
+		if (!state->getGame()->getSavedGame()->isResearched(item->getRules()->getRequirements()))
+			return state->tr("STR_ALIEN_ARTIFACT");
+		return state->tr(item->getRules()->getName());
+	}
+
 	std::string itemText(BattlescapeState *state, BattleItem *item)
 	{
-		std::string name = state->tr(item->getRules()->getName());
+		std::string name = itemName(state, item);
 		if (!item->getRules()->getCompatibleAmmo()->empty())
 		{
 			BattleItem *ammo = item->getAmmoItem();
@@ -441,7 +455,7 @@ namespace
 		std::vector<BattleItem *> *items = tile->getInventory();
 		const size_t shown = full ? items->size() : 2;
 		for (size_t i = 0; i < items->size() && i < shown; ++i)
-			parts.push_back(state->tr((*items)[i]->getRules()->getName()));
+			parts.push_back(itemName(state, (*items)[i]));
 		if (items->size() > shown)
 			parts.push_back(Vocab::format(Vocab::MORE_ITEMS, { num((int)(items->size() - shown)) }));
 
@@ -479,6 +493,18 @@ namespace
 		return text;
 	}
 
+	/// The reserve setting as the game's tooltip for its button says it.
+	std::string reserveText(BattlescapeState *state, BattleActionType reserve)
+	{
+		switch (reserve)
+		{
+		case BA_SNAPSHOT: return state->tr("STR_RESERVE_TIME_UNITS_FOR_SNAP_SHOT");
+		case BA_AIMEDSHOT: return state->tr("STR_RESERVE_TIME_UNITS_FOR_AIMED_SHOT");
+		case BA_AUTOSHOT: return state->tr("STR_RESERVE_TIME_UNITS_FOR_AUTO_SHOT");
+		default: return state->tr("STR_DONT_RESERVE_TIME_UNITS");
+		}
+	}
+
 	std::string unitSummary(BattlescapeState *state, BattleUnit *unit)
 	{
 		return Vocab::format(Vocab::UNIT_SUMMARY, { unit->getName(state->getGame()->getLanguage()), num(unit->getTimeUnits()) });
@@ -496,6 +522,11 @@ namespace
 			num(unit->getMorale()) }));
 		if (unit->isKneeled())
 			parts.push_back(Vocab::get(Vocab::KNEELING));
+		SavedBattleGame *save = state->getBattleGame()->getSave();
+		if (save->getTUReserved() != BA_NONE)
+			parts.push_back(reserveText(state, save->getTUReserved()));
+		if (save->getKneelReserved())
+			parts.push_back(state->tr("STR_RESERVE_TIME_UNITS_FOR_KNEEL"));
 		parts.push_back(Vocab::format(Vocab::FACING, { dirName(unit->getDirection()) }));
 		BattleItem *left = unit->getItem("STR_LEFT_HAND"), *right = unit->getItem("STR_RIGHT_HAND");
 		parts.push_back(Vocab::format(Vocab::RIGHT_HAND, { right ? itemText(state, right) : Vocab::get(Vocab::EMPTY) }));
@@ -521,6 +552,58 @@ namespace
 		map->setSelectorTile(_cursor);
 	}
 
+	/// Why a soldier can't see a unit, checked in TileEngine::visible's order: too far, too dark,
+	/// then outside the 90 degree view cone, then a sight line from the eyes to the unit's middle,
+	/// naming what it hits. A sighted player sees the map, so the obstacle is named only if its
+	/// tile has been seen. Empty when there's no clear reason (the game also tries other lines).
+	std::string outOfViewReason(SavedBattleGame *save, BattleUnit *viewer, BattleUnit *unit)
+	{
+		TileEngine *engine = save->getTileEngine();
+		Position from = viewer->getPosition(), to = unit->getPosition();
+		int dist = engine->distance(from, to);
+		if (dist > 20) // TileEngine::MAX_VIEW_DISTANCE, which is private
+			return Vocab::get(Vocab::VIEW_TOO_FAR);
+		Tile *target = save->getTile(to);
+		if (viewer->getFaction() == FACTION_PLAYER && dist > 9 && target->getShade() > TileEngine::MAX_DARKNESS_TO_SEE_UNITS)
+			return Vocab::get(Vocab::VIEW_TOO_DARK);
+		if (!viewer->checkViewSector(to))
+			return Vocab::get(Vocab::VIEW_FACING_AWAY);
+
+		Position origin = engine->getSightOriginVoxel(viewer);
+		Position aim(to.x * 16 + 8, to.y * 16 + 8, to.z * 24 - target->getTerrainLevel() + unit->getFloatHeight() + unit->getHeight() / 2);
+		std::vector<Position> line;
+		int hit = engine->calculateLine(origin, aim, true, &line, viewer);
+		if (line.empty())
+			return std::string();
+		Position voxel = line.back();
+		Tile *tile = save->getTile(Position(voxel.x / 16, voxel.y / 16, voxel.z / 24));
+		if (hit == V_UNIT)
+		{
+			BattleUnit *blocker = tile ? tile->getUnit() : 0;
+			if (!blocker && tile && voxel.z % 24 < 4)
+			{
+				Tile *below = save->getTile(tile->getPosition() + Position(0, 0, -1));
+				blocker = below ? below->getUnit() : 0;
+			}
+			if (blocker && blocker != unit)
+				return unitShown(blocker) ? Vocab::format(Vocab::VIEW_BLOCKED_BY, { unitLabel(blocker) }) : Vocab::get(Vocab::VIEW_BLOCKED);
+			// The line reaches the unit, so it's the smoke along the way.
+			for (const Position &p : line)
+			{
+				Tile *t = save->getTile(Position(p.x / 16, p.y / 16, p.z / 24));
+				if (t && t->getSmoke() > 0 && t->getFire() == 0)
+					return Vocab::get(Vocab::VIEW_SMOKE);
+			}
+			return std::string();
+		}
+		if (hit < V_FLOOR || hit > V_OBJECT || !tile)
+			return std::string();
+		// A west or north wall can be seen from either side; isDiscovered(0) and (1) are the far side.
+		bool seenIt = tile->isDiscovered(2) || (hit == V_WESTWALL && tile->isDiscovered(0)) || (hit == V_NORTHWALL && tile->isDiscovered(1));
+		std::string name = seenIt ? TerrainNames::get(tile->getMapData((TilePart)hit)) : std::string();
+		return name.empty() ? Vocab::get(Vocab::VIEW_BLOCKED) : Vocab::format(Vocab::VIEW_BLOCKED_BY, { name });
+	}
+
 	/// While aiming: whether the soldier can see the unit on a tile. That's what the HUD's
 	/// numbered enemy buttons show, so a sighted player knows it too.
 	std::string targetText(BattlescapeState *state, Position p)
@@ -535,8 +618,10 @@ namespace
 		if (unit->getFaction() == FACTION_PLAYER)
 			return Vocab::get(Vocab::FRIENDLY);
 		std::vector<BattleUnit *> *seen = action->actor->getVisibleUnits();
-		bool inView = std::find(seen->begin(), seen->end(), unit) != seen->end();
-		return Vocab::get(inView ? Vocab::IN_VIEW : Vocab::OUT_OF_VIEW);
+		if (std::find(seen->begin(), seen->end(), unit) != seen->end())
+			return Vocab::get(Vocab::IN_VIEW);
+		std::string why = outOfViewReason(saveOf(state), action->actor, unit);
+		return why.empty() ? Vocab::get(Vocab::OUT_OF_VIEW) : joinComma({ Vocab::get(Vocab::OUT_OF_VIEW), why });
 	}
 
 	void moveCursor(BattlescapeState *state, Position to, bool levelChange, bool interrupt = true)
@@ -572,6 +657,17 @@ namespace
 			pos = next;
 		}
 		return total;
+	}
+
+	/// "9 steps, the long way round": the path's length, and a detour flag when it takes three or
+	/// more steps beyond the fewest possible (diagonals count as one step).
+	std::string routeText(Position from, Position to, size_t steps)
+	{
+		std::string text = steps == 1 ? Vocab::get(Vocab::ONE_STEP) : Vocab::format(Vocab::PATH_STEPS, { num((int)steps) });
+		int fewest = std::max({ std::abs(to.x - from.x), std::abs(to.y - from.y), std::abs(to.z - from.z) });
+		if ((int)steps >= fewest + 3)
+			text = joinComma({ text, Vocab::get(Vocab::DETOUR) });
+		return text;
 	}
 
 	/// Enter: a left click on the cursor tile.
@@ -665,10 +761,15 @@ namespace
 			return;
 		}
 		int cost = pathCost(save, before), tus = before->getTimeUnits();
+		// The route a sighted player sees drawn: its length, whether it bends well away from the
+		// straight line, and the yellow markers for a walk into reserved TUs.
+		std::string route = routeText(before->getPosition(), target, pf->getPath().size());
+		if (cost <= tus && !bg->checkReservedTU(before, cost, true))
+			route = joinComma({ route, Vocab::get(Vocab::INTO_RESERVE) });
 		if (cost <= tus)
-			say(Vocab::format(Vocab::PATH_COST, { num(cost), num(tus - cost) }), true);
+			say(Vocab::format(Vocab::PATH_COST, { num(cost), num(tus - cost), route }), true);
 		else
-			say(Vocab::format(Vocab::PATH_TOO_FAR, { num(cost), num(tus) }), true);
+			say(Vocab::format(Vocab::PATH_TOO_FAR, { num(cost), num(tus), route }), true);
 	}
 
 	/// Backspace: a right click on the cursor tile. Cancels a preview or targeting first, like the mouse.
@@ -783,7 +884,7 @@ namespace
 				if (category == SCAN_ITEMS && !tile->getInventory()->empty())
 				{
 					std::vector<BattleItem *> *items = tile->getInventory();
-					std::string name = state->tr(items->front()->getRules()->getName());
+					std::string name = itemName(state, items->front());
 					if (items->size() > 1)
 						name = Vocab::format(Vocab::AND_LIST, { name, Vocab::format(Vocab::MORE_ITEMS, { num((int)items->size() - 1) }) });
 					out.push_back({ name, tile->getPosition(), 0, 0 });
@@ -1010,7 +1111,10 @@ namespace
 		_awaiting = false;
 		_endTurnArmed = 0;
 		_lastFloor.clear();
-		_cursor = Position(save->getMapSizeX() / 2, save->getMapSizeY() / 2, 0);
+		_reserve = save->getTUReserved();
+		_kneelReserve = save->getKneelReserved();
+		_zeroPending = false;
+		_cursor =Position(save->getMapSizeX() / 2, save->getMapSizeY() / 2, 0);
 		// Enter previews a move before making it, so the game's two-click move must be on.
 		if (Options::battleNewPreviewPath == PATH_NONE)
 			Options::battleNewPreviewPath = PATH_FULL;
@@ -1108,6 +1212,10 @@ bool handleKey(BattlescapeState *state, SDLKey key, bool shift, bool ctrl)
 	case SDLK_LSHIFT:
 		// The game binds Left Shift alone to previous soldier, which fires on every Shift+key.
 		return true;
+	case SDLK_DELETE:
+		// The game's expend-all-TUs key: let it through and say the result next frame.
+		_zeroPending = true;
+		return false;
 	case SDLK_SPACE:
 		if (_soldier && !_soldier->isOut())
 			say(unitStatus(state, _soldier), true);
@@ -1145,6 +1253,24 @@ void update(BattlescapeState *state)
 	{
 		_kneeled = _soldier->isKneeled();
 		say(Vocab::get(_kneeled ? Vocab::KNEELING : Vocab::STANDING), true);
+	}
+
+	// Reserve changes, replies to F1 to F4 and J. The texts are the buttons' tooltips.
+	if (save->getTUReserved() != _reserve)
+	{
+		_reserve = save->getTUReserved();
+		say(reserveText(state, _reserve), true);
+	}
+	if (save->getKneelReserved() != _kneelReserve)
+	{
+		_kneelReserve = save->getKneelReserved();
+		say(joinComma({ state->tr("STR_RESERVE_TIME_UNITS_FOR_KNEEL"), Vocab::get(_kneelReserve ? Vocab::ON : Vocab::OFF) }), true);
+	}
+	if (_zeroPending)
+	{
+		_zeroPending = false;
+		if (_soldier && !_soldier->isOut() && _soldier->getTimeUnits() == 0)
+			say(Vocab::get(Vocab::TUS_SPENT), true);
 	}
 
 	// Newly spotted hostiles, queued since they're narration rather than a reply to a key.
