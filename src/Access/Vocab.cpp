@@ -227,6 +227,18 @@ namespace
 		"empty",
 		"previous article",
 		"next article",
+		"category",
+		"Right adds one, Left takes one away. Shift for five, Ctrl for as many as possible",
+		"{0}, {1} each, {2} in base, buying {3}",
+		"{0}, {1} in base, selling {2}, {3} each",
+		"{0}, {1} here, sending {2}, {3} at destination",
+		"{0}, {1} held, removing {2}",
+		"under interrogation",
+		"transfer cost {0}",
+		"not enough space, OK is hidden until there is",
+		"{0}, row {1}, column {2}",
+		"{0}, under construction, {1} days",
+		"base grid",
 	};
 }
 

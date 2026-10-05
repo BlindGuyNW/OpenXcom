@@ -48,6 +48,8 @@ public:
 	~PlaceLiftState();
 	/// Handler for clicking the base view.
 	void viewClick(Action *action);
+	/// Gets the base view (accessibility).
+	BaseView *getView() const { return _view; }
 };
 
 }

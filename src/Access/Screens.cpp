@@ -105,6 +105,16 @@
 #include "../Basescape/SoldiersState.h"
 #include "../Basescape/StoresState.h"
 #include "../Basescape/TransfersState.h"
+#include "../Basescape/PurchaseState.h"
+#include "../Basescape/SellState.h"
+#include "../Basescape/TransferBaseState.h"
+#include "../Basescape/TransferConfirmState.h"
+#include "../Basescape/TransferItemsState.h"
+#include "../Basescape/ManageAlienContainmentState.h"
+#include "../Basescape/PlaceLiftState.h"
+#include "../Basescape/BaseView.h"
+#include "../Savegame/BaseFacility.h"
+#include "../Mod/RuleBaseFacility.h"
 #include "../Savegame/ResearchProject.h"
 #include "../Basescape/CraftInfoState.h"
 #include "../Basescape/CraftsState.h"
@@ -295,14 +305,16 @@ std::string firstText(State *state)
 	return "";
 }
 
-/// Every visible text of a state in reading order, top to bottom then left to right, as sentences.
-/// For screens that are just something to read.
-std::string allText(State *state)
+/// Every visible text of a state in reading order, top to bottom then left to right, as sentences,
+/// leaving out skip (a hover tooltip).
+std::string allTextExcept(State *state, Surface *skip)
 {
 	// Text edits count too: some screens' titles are editable names.
 	std::vector<std::pair<Surface *, std::string> > texts;
 	for (Surface *s : state->getSurfaces())
 	{
+		if (s == skip)
+			continue;
 		std::string line;
 		if (Text *text = dynamic_cast<Text *>(s))
 			line = text->getText();
@@ -327,6 +339,12 @@ std::string allText(State *state)
 			result += ".";
 	}
 	return result;
+}
+
+/// Every visible text of a state in reading order, as sentences. For screens that are just something to read.
+std::string allText(State *state)
+{
+	return allTextExcept(state, 0);
 }
 
 bool overlaps(int a, int aLen, int b, int bLen)
@@ -1047,6 +1065,99 @@ AccessScreen medikit()
 	return s;
 }
 
+/// How one arrow-row screen works: the list's rows have little arrows that add to or take from an order.
+struct ArrowRows
+{
+	/// Changes the selected row's order: sign > 0 adds, count is how many (INT_MAX for as many as possible).
+	std::function<void(State *, int sign, int count)> change;
+	/// Says a row, its columns named.
+	std::function<std::string(TextList *, size_t)> row;
+	/// The lines that change with the order (cost, space), or null.
+	std::function<std::string(State *)> totals;
+	/// The category filter, or null.
+	std::function<ComboBox *(State *)> category;
+	Vocab::Id hint;
+};
+
+/// A list whose rows are changed with Left/Right (Shift five, Ctrl as many as possible), the way the
+/// rows' arrows do. Each change says the row again, then the totals. Right always adds, whichever way
+/// the screen's arrows point. Uses the states' public by-value methods; the rows' arrows aren't widgets.
+AccessScreen arrowRowScreen(const std::string &key, std::function<bool(State *)> isActive, const ArrowRows &rows)
+{
+	AccessScreen s = simpleScreen(key, isActive);
+	s.build = [rows](GraphBuilder &b, State *state)
+	{
+		addWidgets(b, state, [state, rows](Surface *surface, size_t row, NodeVtable &v)
+		{
+			if (ComboBox *box = dynamic_cast<ComboBox *>(surface))
+			{
+				// The heuristic would label it with the funds line above it.
+				if (rows.category && rows.category(state) == box)
+					v = Controls::comboBox(state, box, Vocab::get(Vocab::CATEGORY));
+				return;
+			}
+			TextList *list = dynamic_cast<TextList *>(surface);
+			if (!list || row == NO_ROW)
+				return;
+			v.OnAdjust = [state, list, row, rows](int sign, bool large)
+			{
+				// A left press on the row is how the screen learns which row the arrows act on.
+				Controls::clickRow(state, list, row);
+				// Ctrl is the arrows' right click: as many as possible.
+				int count = std::abs(sign) >= Controls::ADJUST_LIMIT ? INT_MAX : (large ? 5 : 1);
+				rows.change(state, sign, count);
+			};
+			v.Announcements.clear();
+			v.Announcements.push_back(NodeAnnouncement([list, row, rows] { return rows.row(list, row); }, false, AnnouncementKinds::Label));
+			// The game ignores clicks on the row itself, so Enter re-reads it with how to change it.
+			static bool hint = false;
+			v.OnActivate = [] { hint = true; };
+			v.StateText = [state, list, row, rows]
+			{
+				std::string text = rows.row(list, row);
+				if (rows.totals)
+				{
+					std::string totals = rows.totals(state);
+					if (!totals.empty())
+						text += ". " + totals;
+				}
+				if (hint)
+					text += ". " + Vocab::get(rows.hint);
+				hint = false;
+				return text;
+			};
+		});
+	};
+	return s;
+}
+
+/// The visible ones of some text lines, as sentences.
+std::string visibleTexts(const std::vector<Text *> &texts)
+{
+	std::string result;
+	for (Text *t : texts)
+	{
+		if (!t->getVisible())
+			continue;
+		std::string line = t->getText();
+		if (line.empty())
+			continue;
+		if (!result.empty())
+			result += ". ";
+		result += line;
+	}
+	return result;
+}
+
+/// The totals, plus a warning when the screen has hidden its OK button for lack of space.
+std::string totalsWithOk(const std::vector<Text *> &texts, TextButton *ok)
+{
+	std::string text = visibleTexts(texts);
+	if (!ok->getVisible())
+		text += ". " + Vocab::get(Vocab::NO_ROOM_OK);
+	return text;
+}
+
 /// "Pistol, 4 in stores, 2 on craft". New Battle shows "-" for its unlimited stores.
 std::string equipRowText(TextList *list, size_t row)
 {
@@ -1058,44 +1169,189 @@ std::string equipRowText(TextList *list, size_t row)
 		+ Vocab::format(Vocab::ON_CRAFT, { Controls::cellText(list, row, 2) });
 }
 
-/// Moving items between the base's stores and the craft: Left/Right on a row, Shift for five.
+/// A four-column row read through a format: the cells in order.
+std::function<std::string(TextList *, size_t)> fourColumnRow(Vocab::Id id)
+{
+	return [id](TextList *list, size_t row)
+	{
+		if (list->getCellCount(row) < 4)
+			return Controls::rowText(list, row);
+		return Vocab::format(id, { Controls::cellText(list, row, 0), Controls::cellText(list, row, 1), Controls::cellText(list, row, 2), Controls::cellText(list, row, 3) });
+	};
+}
+
+/// Moving items between the base's stores and the craft: Right to the craft, Left back to the stores.
 AccessScreen craftEquipment()
 {
-	AccessScreen s = simpleScreen("craftEquipment", is<CraftEquipmentState>);
-	s.build = [](GraphBuilder &b, State *state)
+	ArrowRows rows;
+	rows.change = [](State *state, int sign, int count)
 	{
-		addWidgets(b, state, [state](Surface *surface, size_t row, NodeVtable &v)
-		{
-			TextList *list = dynamic_cast<TextList *>(surface);
-			if (!list || row == NO_ROW)
-				return;
-			v.OnAdjust = [state, list, row](int sign, bool large)
-			{
-				// A left press on the row is how the screen learns which item the arrows act on.
-				Controls::clickRow(state, list, row);
-				CraftEquipmentState *equip = static_cast<CraftEquipmentState *>(state);
-				// Ctrl is the arrows' right click: as many as fit, or all back to the stores.
-				int count = std::abs(sign) >= Controls::ADJUST_LIMIT ? INT_MAX : (large ? 5 : 1);
-				if (sign < 0)
-					equip->moveLeftByValue(count);
-				else
-					equip->moveRightByValue(count);
-			};
-			v.Announcements.clear();
-			v.Announcements.push_back(NodeAnnouncement([list, row] { return equipRowText(list, row); }, false, AnnouncementKinds::Label));
-			// The game ignores clicks on the row itself, so Enter re-reads it with how to move items.
-			static bool hint = false;
-			v.OnActivate = [] { hint = true; };
-			v.StateText = [list, row]
-			{
-				std::string text = equipRowText(list, row);
-				if (hint)
-					text += ". " + Vocab::get(Vocab::EQUIP_HINT);
-				hint = false;
-				return text;
-			};
-		});
+		CraftEquipmentState *equip = static_cast<CraftEquipmentState *>(state);
+		if (sign < 0)
+			equip->moveLeftByValue(count);
+		else
+			equip->moveRightByValue(count);
 	};
+	rows.row = equipRowText;
+	rows.hint = Vocab::EQUIP_HINT;
+	return arrowRowScreen("craftEquipment", is<CraftEquipmentState>, rows);
+}
+
+/// Buying: "Pistol, $800 each, 4 in base, buying 2"; each change says the cost of purchases and the stores.
+AccessScreen purchase()
+{
+	ArrowRows rows;
+	rows.change = [](State *state, int sign, int count)
+	{
+		PurchaseState *p = static_cast<PurchaseState *>(state);
+		if (sign < 0)
+			p->decreaseByValue(count);
+		else
+			p->increaseByValue(count);
+	};
+	rows.row = fourColumnRow(Vocab::BUY_ROW);
+	rows.totals = [](State *state) { return visibleTexts(static_cast<PurchaseState *>(state)->getTotals()); };
+	rows.category = [](State *state) { return static_cast<PurchaseState *>(state)->getCategory(); };
+	rows.hint = Vocab::ROW_HINT;
+	AccessScreen s = arrowRowScreen("purchase", is<PurchaseState>, rows);
+	s.name = [](State *state)
+	{
+		PurchaseState *p = static_cast<PurchaseState *>(state);
+		std::vector<Text *> lines = { p->getFundsText() };
+		for (Text *t : p->getTotals())
+			lines.push_back(t);
+		return firstText(state) + ". " + visibleTexts(lines);
+	};
+	return s;
+}
+
+/// Selling and sacking: "Pistol, 4 in base, selling 2, $560 each"; each change says the sales value and the stores.
+AccessScreen sell()
+{
+	ArrowRows rows;
+	rows.change = [](State *state, int sign, int count)
+	{
+		static_cast<SellState *>(state)->changeByValue(count, sign < 0 ? -1 : 1);
+	};
+	rows.row = fourColumnRow(Vocab::SELL_ROW);
+	rows.totals = [](State *state)
+	{
+		SellState *sell = static_cast<SellState *>(state);
+		return totalsWithOk(sell->getTotals(), sell->getOkButton());
+	};
+	rows.category = [](State *state) { return static_cast<SellState *>(state)->getCategory(); };
+	rows.hint = Vocab::ROW_HINT;
+	AccessScreen s = arrowRowScreen("sell", is<SellState>, rows);
+	s.name = [rows](State *state)
+	{
+		SellState *sell = static_cast<SellState *>(state);
+		return firstText(state) + ". " + sell->getFundsText()->getText() + ". " + rows.totals(state);
+	};
+	return s;
+}
+
+/// Transferring to another base: "Pistol, 4 here, sending 2, 1 at destination"; each change says the cost.
+AccessScreen transferItems()
+{
+	ArrowRows rows;
+	rows.change = [](State *state, int sign, int count)
+	{
+		TransferItemsState *t = static_cast<TransferItemsState *>(state);
+		if (sign < 0)
+			t->decreaseByValue(count);
+		else
+			t->increaseByValue(count);
+	};
+	rows.row = fourColumnRow(Vocab::TRANSFER_ROW);
+	rows.totals = [](State *state)
+	{
+		return Vocab::format(Vocab::TRANSFER_COST, { Unicode::formatFunding(static_cast<TransferItemsState *>(state)->getTotal()) });
+	};
+	rows.category = [](State *state) { return static_cast<TransferItemsState *>(state)->getCategory(); };
+	rows.hint = Vocab::ROW_HINT;
+	AccessScreen s = arrowRowScreen("transferItems", is<TransferItemsState>, rows);
+	s.name = firstText;
+	return s;
+}
+
+/// Containment: "Sectoid Soldier, 3 held, removing 1, under interrogation"; each change says the space.
+AccessScreen alienContainment()
+{
+	ArrowRows rows;
+	rows.change = [](State *state, int sign, int count)
+	{
+		ManageAlienContainmentState *c = static_cast<ManageAlienContainmentState *>(state);
+		if (sign < 0)
+			c->decreaseByValue(count);
+		else
+			c->increaseByValue(count);
+	};
+	rows.row = [](TextList *list, size_t row)
+	{
+		if (list->getCellCount(row) < 4)
+			return Controls::rowText(list, row);
+		std::string text = Vocab::format(Vocab::CONTAINMENT_ROW, { Controls::cellText(list, row, 0), Controls::cellText(list, row, 1), Controls::cellText(list, row, 2) });
+		if (Controls::cellText(list, row, 3) != "0")
+			text += ", " + Vocab::get(Vocab::UNDER_INTERROGATION);
+		return text;
+	};
+	rows.totals = [](State *state)
+	{
+		ManageAlienContainmentState *c = static_cast<ManageAlienContainmentState *>(state);
+		return totalsWithOk(c->getTotals(), c->getOkButton());
+	};
+	rows.hint = Vocab::ROW_HINT;
+	AccessScreen s = arrowRowScreen("alienContainment", is<ManageAlienContainmentState>, rows);
+	s.name = [rows](State *state) { return firstText(state) + ". " + rows.totals(state); };
+	return s;
+}
+
+/// A base square: "Living Quarters, row 2, column 3", or "empty, ...". Facilities still being built say the days left.
+std::string baseSquareText(State *state, BaseView *view, int x, int y)
+{
+	std::string content = Vocab::get(Vocab::LIST_EMPTY);
+	if (BaseFacility *fac = view->getFacilityAt(x, y))
+	{
+		content = state->tr(fac->getRules()->getType());
+		if (fac->getBuildTime() > 0)
+			content = Vocab::format(Vocab::UNDER_CONSTRUCTION, { content, std::to_string(fac->getBuildTime()) });
+	}
+	return Vocab::format(Vocab::GRID_SQUARE, { content, std::to_string(y + 1), std::to_string(x + 1) });
+}
+
+/// The base's 6 by 6 grid as rows of squares: arrows move in two dimensions, Enter clicks the square
+/// as the mouse would, after selecting it the way hovering does (which also moves the selector box).
+void addBaseGrid(GraphBuilder &b, State *state, BaseView *view)
+{
+	const int size = 6;
+	b.PushContext(Vocab::get(Vocab::BASE_GRID));
+	for (int y = 0; y < size; ++y)
+	{
+		b.StartRow("grid");
+		for (int x = 0; x < size; ++x)
+		{
+			NodeVtable v;
+			v.Announcements.push_back(NodeAnnouncement([state, view, x, y] { return baseSquareText(state, view, x, y); }, false, AnnouncementKinds::Label));
+			v.OnActivate = [state, view, x, y]
+			{
+				view->selectSquare(x, y);
+				Controls::click(state, view);
+			};
+			b.AddItem(ControlId::Referenced(view, "square:" + std::to_string(x) + ":" + std::to_string(y)), v);
+		}
+		b.EndRow();
+	}
+	b.PopContext();
+}
+
+/// Placing a new base's access lift: the title, then the grid. Enter on any square places it there.
+AccessScreen placeLift()
+{
+	AccessScreen s;
+	s.key = "placeLift";
+	s.isActive = is<PlaceLiftState>;
+	s.name = firstText;
+	s.build = [](GraphBuilder &b, State *state) { addBaseGrid(b, state, static_cast<PlaceLiftState *>(state)->getView()); };
 	return s;
 }
 
@@ -1398,8 +1654,10 @@ AccessScreen basescape()
 	s.isActive = is<BasescapeState>;
 	s.name = [](State *state)
 	{
-		shown = static_cast<BasescapeState *>(state)->getBase();
-		return allText(state);
+		BasescapeState *bs = static_cast<BasescapeState *>(state);
+		shown = bs->getBase();
+		// The hover tooltip names whatever facility the mouse happens to be over.
+		return allTextExcept(state, bs->getFacilityText());
 	};
 	s.build = [](GraphBuilder &b, State *state)
 	{
@@ -1426,7 +1684,7 @@ AccessScreen basescape()
 		if (base == shown)
 			return;
 		shown = base;
-		Speech::say(allText(state), true);
+		Speech::say(allTextExcept(state, static_cast<BasescapeState *>(state)->getFacilityText()), true);
 	};
 	return s;
 }
@@ -1857,6 +2115,13 @@ const std::vector<AccessScreen> &all()
 		monthlyCosts(),
 		tableScreen("stores", is<StoresState>, { "STR_QUANTITY_UC", "STR_SPACE_USED_UC" }),
 		tableScreen("transfers", is<TransfersState>, { "STR_QUANTITY_UC", "STR_ARRIVAL_TIME_HOURS" }),
+		purchase(),
+		sell(),
+		tableScreen("transferBase", is<TransferBaseState>, { "STR_AREA" }),
+		transferItems(),
+		popupScreen("transferConfirm", is<TransferConfirmState>),
+		alienContainment(),
+		placeLift(),
 		tableScreen("soldiers", is<SoldiersState>, {}),
 		research(),
 		tableScreen("newResearchList", is<NewResearchListState>, {}),

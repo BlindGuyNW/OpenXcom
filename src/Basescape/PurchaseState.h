@@ -100,6 +100,12 @@ public:
 	void updateItemStrings();
 	/// Handler for changing the category filter.
 	void cbxCategoryChange(Action *action);
+	/// Gets the funds line (accessibility).
+	Text *getFundsText() const { return _txtFunds; }
+	/// Gets the lines that change as the order does: cost, then stores (accessibility).
+	std::vector<Text*> getTotals() const { return { _txtPurchases, _txtSpaceUsed }; }
+	/// Gets the category filter (accessibility).
+	ComboBox *getCategory() const { return _cbxCategory; }
 };
 
 }

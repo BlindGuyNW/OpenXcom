@@ -87,6 +87,10 @@ public:
 	void decreaseByValue(int change);
 	/// Updates the quantity-strings of the selected alien.
 	void updateStrings();
+	/// Gets the lines that change as the order does: space available, then used (accessibility).
+	std::vector<Text*> getTotals() const { return { _txtAvailable, _txtUsed }; }
+	/// Gets the OK button, hidden while containment would overflow (accessibility).
+	TextButton *getOkButton() const { return _btnOk; }
 };
 
 }

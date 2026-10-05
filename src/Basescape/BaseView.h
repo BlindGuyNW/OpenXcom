@@ -74,6 +74,10 @@ public:
 	int getGridY() const;
 	/// Sets whether the base view is selectable.
 	void setSelectable(int size);
+	/// Selects a square as hovering it with the mouse would (accessibility).
+	void selectSquare(int x, int y);
+	/// Gets the facility covering a square, or null (accessibility).
+	BaseFacility *getFacilityAt(int x, int y) const;
 	/// Checks if a facility can be placed.
 	bool isPlaceable(RuleBaseFacility *rule) const;
 	/// Checks if the placed facility is placed in queue or not.

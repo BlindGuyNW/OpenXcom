@@ -106,6 +106,8 @@ public:
 	int getTotal() const;
 	/// Handler for changing the category filter.
 	void cbxCategoryChange(Action *action);
+	/// Gets the category filter (accessibility).
+	ComboBox *getCategory() const { return _cbxCategory; }
 };
 
 }

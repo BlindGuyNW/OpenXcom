@@ -510,6 +510,41 @@ void BaseView::blit(Surface *surface)
  * @param action Pointer to an action.
  * @param state State that the action handlers belong to.
  */
+/**
+ * Selects a square the way hovering it with the mouse does:
+ * the selected facility, and the selector when placing something.
+ * @param x Grid X.
+ * @param y Grid Y.
+ */
+void BaseView::selectSquare(int x, int y)
+{
+	if (x < 0 || x >= BASE_SIZE || y < 0 || y >= BASE_SIZE)
+		return;
+	_gridX = x;
+	_gridY = y;
+	_selFacility = _facilities[x][y];
+	if (_selSize > 0)
+	{
+		bool fits = _gridX + _selSize - 1 < BASE_SIZE && _gridY + _selSize - 1 < BASE_SIZE;
+		_selector->setX(_x + _gridX * GRID_SIZE);
+		_selector->setY(_y + _gridY * GRID_SIZE);
+		_selector->setVisible(fits);
+	}
+}
+
+/**
+ * Gets the facility covering a square.
+ * @param x Grid X.
+ * @param y Grid Y.
+ * @return The facility, or null if the square is empty or off the grid.
+ */
+BaseFacility *BaseView::getFacilityAt(int x, int y) const
+{
+	if (x < 0 || x >= BASE_SIZE || y < 0 || y >= BASE_SIZE)
+		return 0;
+	return _facilities[x][y];
+}
+
 void BaseView::mouseOver(Action *action, State *state)
 {
 	_gridX = (int)floor(action->getRelativeXMouse() / (GRID_SIZE * action->getXScale()));
