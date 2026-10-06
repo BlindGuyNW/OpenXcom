@@ -299,6 +299,8 @@ namespace Vocab
 		OPTION_FIXED,
 		KEY_NONE,
 		KEY_WAITING,
+		STAT_OF,
+		STAT_STUN,
 		COUNT
 	};
 

@@ -685,6 +685,40 @@ void UnitInfoState::init()
 
 
 /**
+ * Gets the stat lines in screen order, for the accessibility layer.
+ */
+std::vector<UnitInfoState::StatLine> UnitInfoState::getStatLines() const
+{
+	std::vector<StatLine> lines = {
+		{ _txtTimeUnits, _numTimeUnits, _barTimeUnits },
+		{ _txtEnergy, _numEnergy, _barEnergy },
+		{ _txtHealth, _numHealth, _barHealth },
+		{ _txtFatalWounds, _numFatalWounds, _barFatalWounds },
+		{ _txtBravery, _numBravery, _barBravery },
+		{ _txtMorale, _numMorale, _barMorale },
+		{ _txtReactions, _numReactions, _barReactions },
+		{ _txtFiring, _numFiring, _barFiring },
+		{ _txtThrowing, _numThrowing, _barThrowing },
+		{ _txtMelee, _numMelee, _barMelee },
+		{ _txtStrength, _numStrength, _barStrength },
+	};
+	// Created only when the mod has mana; the pointers are unset otherwise.
+	if (_game->getMod()->isManaFeatureEnabled())
+		lines.push_back({ _txtMana, _numMana, _barMana });
+	std::vector<StatLine> rest = {
+		{ _txtPsiStrength, _numPsiStrength, _barPsiStrength },
+		{ _txtPsiSkill, _numPsiSkill, _barPsiSkill },
+		{ _txtFrontArmor, _numFrontArmor, _barFrontArmor },
+		{ _txtLeftArmor, _numLeftArmor, _barLeftArmor },
+		{ _txtRightArmor, _numRightArmor, _barRightArmor },
+		{ _txtRearArmor, _numRearArmor, _barRearArmor },
+		{ _txtUnderArmor, _numUnderArmor, _barUnderArmor },
+	};
+	lines.insert(lines.end(), rest.begin(), rest.end());
+	return lines;
+}
+
+/**
  * Closes the window on right-click.
  * @param action Pointer to an action.
  */

@@ -61,6 +61,15 @@ private:
 	Bar *_barFrontArmor, *_barLeftArmor, *_barRightArmor, *_barRearArmor, *_barUnderArmor;
 	TextButton *_btnPrev, *_btnNext;
 public:
+	/// A stat line for the accessibility layer: its label, the number shown and its bar.
+	struct StatLine { Text *label, *value; Bar *bar; };
+	/// Gets the stat lines in screen order (hidden ones included; check the label's visibility).
+	std::vector<StatLine> getStatLines() const;
+	/// Gets the unit's name text.
+	Text *getNameText() const { return _txtName; }
+	/// Gets the previous/next unit buttons (null for a mind probe).
+	TextButton *getPrevButton() const { return _mindProbe ? 0 : _btnPrev; }
+	TextButton *getNextButton() const { return _mindProbe ? 0 : _btnNext; }
 	/// Creates the Unit Info state.
 	UnitInfoState(BattleUnit *unit, BattlescapeState *parent, bool fromInventory, bool mindProbe);
 	/// Cleans up the Unit Info state.

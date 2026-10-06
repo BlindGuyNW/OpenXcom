@@ -79,6 +79,8 @@
 #include "../Menu/SlideshowState.h"
 #include "../Menu/StatisticsState.h"
 #include "../Geoscape/FundingState.h"
+#include "../Battlescape/UnitInfoState.h"
+#include "../Interface/Bar.h"
 #include "../Geoscape/ProductionCompleteState.h"
 #include "../Geoscape/ResearchCompleteState.h"
 #include "../Geoscape/ResearchRequiredState.h"
@@ -2615,6 +2617,54 @@ AccessScreen tableScreen(const std::string &key, std::function<bool(State *)> is
 	return s;
 }
 
+/// Unit stats (S in battle, the inventory's rank button, a mind probe): the unit's name on arrival; one
+/// item per stat ("Time Units, 40 of 60": the "of" is the bar's maximum, which the bar shows, left off
+/// when the bar is full; health adds the stun the bar shows); then previous and next soldier, which
+/// say the new name. S and Escape close it (the game's keys).
+AccessScreen unitInfo()
+{
+	AccessScreen s;
+	s.key = "unitInfo";
+	s.isActive = is<UnitInfoState>;
+	s.name = [](State *state) { return static_cast<UnitInfoState *>(state)->getNameText()->getText(); };
+	s.build = [](GraphBuilder &b, State *state)
+	{
+		UnitInfoState *info = static_cast<UnitInfoState *>(state);
+		b.BeginStop("stats");
+		std::vector<UnitInfoState::StatLine> lines = info->getStatLines();
+		for (size_t i = 0; i < lines.size(); ++i)
+		{
+			const UnitInfoState::StatLine &line = lines[i];
+			if (!line.label->getVisible())
+				continue;
+			NodeVtable v;
+			v.Announcements.push_back(NodeAnnouncement([line]
+			{
+				std::string value = line.value->getText();
+				if ((int)line.bar->getMax() != (int)line.bar->getValue())
+					value = Vocab::format(Vocab::STAT_OF, { value, std::to_string((int)line.bar->getMax()) });
+				std::string text = line.label->getText() + ", " + value;
+				if ((int)line.bar->getValue2() > 0)
+					text += ", " + Vocab::format(Vocab::STAT_STUN, { std::to_string((int)line.bar->getValue2()) });
+				return text;
+			}, false, AnnouncementKinds::Label));
+			b.AddItem(ControlId::Referenced(line.label, "stat:" + std::to_string(i)), v);
+		}
+		b.BeginStop("buttons");
+		Text *name = info->getNameText();
+		std::pair<TextButton *, Vocab::Id> buttons[] = { { info->getPrevButton(), Vocab::PREVIOUS_SOLDIER }, { info->getNextButton(), Vocab::NEXT_SOLDIER } };
+		for (const std::pair<TextButton *, Vocab::Id> &button : buttons)
+		{
+			if (!button.first)
+				continue;
+			NodeVtable v = Controls::labelledButton(state, button.first, Vocab::get(button.second));
+			v.StateText = [name] { return name->getText(); };
+			b.AddItem(ControlId::Referenced(button.first, button.second == Vocab::PREVIOUS_SOLDIER ? "unit:prev" : "unit:next"), v);
+		}
+	};
+	return s;
+}
+
 /// Funding (F): the title, then "sort by COUNTRY", "sort by FUNDING", "sort by CHANGE" (the active one
 /// says its order; Enter sorts, again to reverse), the countries ("Brazil, FUNDING: $600,000, CHANGE:
 /// +$20,000") and the total, then OK. The game shows the sort only as an arrow on the active column.
@@ -3365,6 +3415,7 @@ const std::vector<AccessScreen> &all()
 		slideshow(),
 		simpleScreen("statistics", is<StatisticsState>),
 		funding(),
+		unitInfo(),
 		popupScreen("productionComplete", is<ProductionCompleteState>),
 		popupScreen("itemsArriving", is<ItemsArrivingState>),
 		popupScreen("multipleTargets", is<MultipleTargetsState>),

@@ -296,6 +296,8 @@ namespace
 		"fixed by the mod",
 		"no key",
 		"press the new key for {0}",
+		"{0} of {1}",
+		"stun {0}",
 	};
 }
 
