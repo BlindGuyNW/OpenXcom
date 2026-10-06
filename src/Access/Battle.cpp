@@ -629,8 +629,9 @@ namespace
 		say(text, interrupt);
 	}
 
-	/// Total TU cost of the path the game just calculated, walked the way previewPath does.
-	int pathCost(SavedBattleGame *save, BattleUnit *unit)
+	/// Total TU cost of the path the game just calculated, walked the way refreshPath does.
+	/// Adds the energy it spends to *energy when given.
+	int pathCost(SavedBattleGame *save, BattleUnit *unit, int *energy = nullptr)
 	{
 		Pathfinding *pf = save->getPathfinding();
 		const std::vector<int> &path = pf->getPath();
@@ -640,9 +641,24 @@ namespace
 		{
 			PathfindingStep step = pf->getTUCost(pos, *i, unit, 0, BAM_NORMAL);
 			total += step.cost.time;
+			if (energy)
+				*energy += step.cost.energy;
 			pos = step.pos;
 		}
 		return total;
+	}
+
+	/// Whether a walk costing these TUs and energy turns the preview markers yellow: the test
+	/// refreshPath makes, including its stand-in auto-shot reserve when none is set.
+	bool eatsIntoReserve(BattlescapeGame *bg, BattleUnit *unit, int tu, int energy)
+	{
+		bool switchBack = bg->getReservedAction() == BA_NONE;
+		if (switchBack)
+			bg->setTUReserved(BA_AUTOSHOT);
+		bool fits = bg->checkReservedTU(unit, tu, energy, true);
+		if (switchBack)
+			bg->setTUReserved(BA_NONE);
+		return !fits;
 	}
 
 	/// "9 steps, the long way round": the path's length, and a detour flag when it takes three or
@@ -744,11 +760,12 @@ namespace
 			say(Vocab::get(Vocab::NO_PATH), true);
 			return;
 		}
-		int cost = pathCost(save, before), tus = before->getTimeUnits();
+		int energy = 0;
+		int cost = pathCost(save, before, &energy), tus = before->getTimeUnits();
 		// The route a sighted player sees drawn: its length, whether it bends well away from the
 		// straight line, and the yellow markers for a walk into reserved TUs.
 		std::string route = routeText(before->getPosition(), target, pf->getPath().size());
-		if (cost <= tus && !bg->checkReservedTU(before, cost, true))
+		if (cost <= tus && eatsIntoReserve(bg, before, cost, energy))
 			route = joinComma({ route, Vocab::get(Vocab::INTO_RESERVE) });
 		if (cost <= tus)
 			say(Vocab::format(Vocab::PATH_COST, { num(cost), num(tus - cost), route }), true);
