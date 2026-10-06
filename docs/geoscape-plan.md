@@ -4,6 +4,8 @@ Written 2026-10-04 from a three-part survey of `src/Geoscape`, `src/Basescape`, 
 
 Read `CLAUDE.md` first (layer architecture, axioms, build). This doc says what to build for the campaign, in what order, and what the survey found that isn't obvious from the code.
 
+**Status (2026-10-06):** M0 to M3 are done. M4: articles, options, monthly report, endings slideshow and funding are done; graphs, psi training and allocation, the soldier diary and the M1 silent-event narration are still to do. Not yet heard in play: base defense, manufacture, DismantleFacility, SackSoldier, Memorial, Purchase, containment. The survey describes **vanilla**: on the OXCE branch, `docs/oxce-audit.md` wins wherever they disagree (dogfights have up to `WeaponMax` weapons, `MultipleTargetsState` takes a crafts vector, placement reasons come from `getPlacementErrorAt`, containment columns differ).
+
 ## 1. Facts that shape the design
 
 ### Time and popups
@@ -55,6 +57,7 @@ Read `CLAUDE.md` first (layer architecture, axioms, build). This doc says what t
 - Dogfights are deleted silently in `handleDogfights`, and their craft or UFO can be deleted too: **narration must store strings, not pointers.**
 
 ### Generic layer gaps the campaign hits everywhere
+*Historical: all fixed by M0 and later (Left/Right paging in articles goes through `OnAdjust`; the heuristic mislabels were replaced by explicit wiring). The Escape list is still accurate and still the policy (decision 3).*
 - **`ErrorMessageState` has no recipe** and is pushed all over (placement, purchase limits, transfers, storage full, no containment after a battle, craft equipment). Essential; `simpleScreen` is enough.
 - **`AccessScreen` has no per-frame tick.** Base defense rows, dogfight narration and arrival popups that update in place need one (or a module ticked from `Navigator::update`, like `Battle::update`).
 - **Button group state isn't spoken.** `TextButton::_group` is private with no getter. Time speed, difficulty, diary tabs need "selected". `ToggleTextButton::getPressed()` exists but isn't read either.
@@ -121,8 +124,8 @@ Not done yet: narrating the silent events (decision 2's queued narration: craft 
 - Popups as `simpleScreen` with Escape reviewed: UfoDetected, UfoLost, MissionDetected, AlienBase, CraftPatrol, LowFuel, CraftError, ResearchComplete, ResearchRequired, NewPossibleResearch (say "no new topics" when empty), NewPossibleManufacture, ProductionComplete, ItemsArriving, MultipleTargets, TargetInfo, GeoscapeCraft, ConfirmDestination.
 - The Ufopaedia start and select lists come free as `simpleScreen`; articles wait for M4.
 
-### M2: intercept, fight, land, come home
-First half in (2026-10-04, played and working 2026-10-04; AliensCrash, BaseDestroyed, ConfirmCydonia and DogfightError not yet seen in play): Intercept, SelectDestination, the dogfight module and recipe, ConfirmLanding, AliensCrash, BaseDestroyed, ConfirmCydonia, DogfightError. Done 2026-10-05: CraftSoldiers (added/removed with spaces free, refusals: wounded, full, craft out; played, craft out not yet seen) and BaseDefense (shots narrated as they resolve, focus to OK; not yet seen in play). Also done 2026-10-05: CraftWeapons (played), Sell/containment via the arrow-row batch (Sell played; containment not yet seen). Debriefing follow-ups (promotions, medals, lost in service, cannot reequip) in and played 2026-10-04. Done since: a new interception starts focus at the top of its window; the Basescape menu (buttons, base switcher; no grid), the craft list and CraftInfo (pulled forward from M3 so craft screens can be reached). Then M3 batch 1 (played 2026-10-04): Soldiers, BaseInfo, Stores, Transfers, MonthlyCosts, Research, NewResearchList, ResearchInfo. Arrow-row batch in 2026-10-05, not yet played: Purchase, Sell, TransferBase, TransferItems, TransferConfirm, ManageAlienContainment, with craft equipment moved onto the shared recipe. PlaceLift (found in play: building a second base left the keyboard dead) got the first cut of the grid: `addBaseGrid`, `BaseView::selectSquare`/`getFacilityAt`. Done 2026-10-05: Build Facilities, PlaceFacility with per-square placement reasons and the Basescape grid (played 2026-10-05); Manufacture (current production, new production list, start, info), DismantleFacility, SackSoldier, Memorial (not yet played). Also 2026-10-05 (played): Tab-stops on every multi-section screen, and load/save sorting by name. The user asked for weapon stats; those are only in Ufopaedia articles, so the M4 article recipe was pulled forward and played 2026-10-04.
+### M2: intercept, fight, land, come home (done; base defense not yet seen in play)
+History (the log below was written as work landed; where it says "not yet played", the status line at the top is current). First half in (2026-10-04, played and working 2026-10-04; AliensCrash, BaseDestroyed, ConfirmCydonia and DogfightError not yet seen in play): Intercept, SelectDestination, the dogfight module and recipe, ConfirmLanding, AliensCrash, BaseDestroyed, ConfirmCydonia, DogfightError. Done 2026-10-05: CraftSoldiers (added/removed with spaces free, refusals: wounded, full, craft out; played, craft out not yet seen) and BaseDefense (shots narrated as they resolve, focus to OK; not yet seen in play). Also done 2026-10-05: CraftWeapons (played), Sell/containment via the arrow-row batch (Sell played; containment not yet seen). Debriefing follow-ups (promotions, medals, lost in service, cannot reequip) in and played 2026-10-04. Done since: a new interception starts focus at the top of its window; the Basescape menu (buttons, base switcher; no grid), the craft list and CraftInfo (pulled forward from M3 so craft screens can be reached). Then M3 batch 1 (played 2026-10-04): Soldiers, BaseInfo, Stores, Transfers, MonthlyCosts, Research, NewResearchList, ResearchInfo. Arrow-row batch in 2026-10-05, not yet played: Purchase, Sell, TransferBase, TransferItems, TransferConfirm, ManageAlienContainment, with craft equipment moved onto the shared recipe. PlaceLift (found in play: building a second base left the keyboard dead) got the first cut of the grid: `addBaseGrid`, `BaseView::selectSquare`/`getFacilityAt`. Done 2026-10-05: Build Facilities, PlaceFacility with per-square placement reasons and the Basescape grid (played 2026-10-05); Manufacture (current production, new production list, start, info), DismantleFacility, SackSoldier, Memorial (not yet played). Also 2026-10-05 (played): Tab-stops on every multi-section screen, and load/save sorting by name. The user asked for weapon stats; those are only in Ufopaedia articles, so the M4 article recipe was pulled forward and played 2026-10-04.
 - `InterceptState`: rows as "name, status, base, N weapons, N soldiers, N HWPs" (accessor for its craft list or parse), refusal feedback when a craft can't go.
 - `SelectDestinationState` recipe (targets + cities, range).
 - Dogfight module and recipe.
@@ -132,7 +135,7 @@ First half in (2026-10-04, played and working 2026-10-04; AliensCrash, BaseDestr
 - Debriefing follow-ups, shown in this order: storage/containment error, `SellState` or containment, `CannotReequipState`, `PromotionsState`, `CommendationState`, `CommendationLateState`. All `simpleScreen` except containment (arrow-row recipe). The existing debriefing recipe works as is.
 - `BaseDefenseState`: narrate rows as they appear (tick), announce OK when it shows.
 
-### M3: running the bases
+### M3: running the bases (done 2026-10-05; manufacture not yet played)
 - Base grid layer (Basescape, BuildFacilities → PlaceFacility, DismantleFacility). Basescape buttons, base switcher as a list of bases (keys 1 to 8 already work), rename.
 - Research: `ResearchState` row formatter; `ResearchInfoState` scientists as one adjustable node via public `moreByValue/lessByValue`, with available and lab space.
 - Manufacture: `ManufactureState` row formatter; `NewManufactureListState` combo label; `ManufactureStartState` says why Start is missing; `ManufactureInfoState` engineers and units as adjustable nodes (`friend`, or click its `ArrowButton`s left/right to get the infinity semantics), sell toggle, profit.
@@ -140,11 +143,11 @@ First half in (2026-10-04, played and working 2026-10-04; AliensCrash, BaseDestr
 - `simpleScreen` (some with row formatters): BaseInfo ("5:7" → "5 of 7"), MonthlyCosts (explicit sections), Stores, Transfers, TransferBase, TransferConfirm, Soldiers, SackSoldier, Crafts, Memorial (join the date cells).
 
 ### M4: the rest
-- Monthly report, funding (name the columns), graphs as data read from the save (the UI is drawn lines and unlabelled icons), psi training and allocation.
-- Ufopaedia article recipe: title, text, stat rows as "label: value" (skip empty armor rows, split craft stats on newlines, item articles: shot table rows from headers, then per ammo "name: damage type, power"; ammo names come from `getCompatibleAmmo()` since they're only sprites). Fix prev/next paging (Left/Right conflict).
+- ~~Monthly report, funding (name the columns)~~ (done 2026-10-06), graphs as data read from the save (the UI is drawn lines and unlabelled icons), psi training and allocation.
+- ~~Ufopaedia article recipe~~ (done 2026-10-04): title, text, stat rows as "label: value" (skip empty armor rows, split craft stats on newlines, item articles: shot table rows from headers, then per ammo "name: damage type, power"; ammo names come from `getCompatibleAmmo()` since they're only sprites). Fix prev/next paging (Left/Right conflict).
 - Soldier diary (tabs, commendation descriptions via the public `lstInfoMouseOver`).
 - Custom initial base (`PlaceLiftState`, `SelectStartFacilityState`), only if wanted.
-- Cutscenes and the end-game slideshow: probably just speak the text.
+- ~~The end-game slideshow~~ (done 2026-10-06: each caption is spoken). Other cutscenes: probably just speak the text.
 
 ## 4. Decisions (answered by the user 2026-10-04)
 
@@ -155,6 +158,5 @@ First half in (2026-10-04, played and working 2026-10-04; AliensCrash, BaseDestr
 5. **The globe scanner sorts nearest to the selected base** (the first base until there's a way to choose). Base placement isn't the scanner: it's the city picker, grouped by region and country.
 
 ## 5. Not covered by the survey
-- The Geoscape's Options button leads to the options screens, which aren't spoken (same as the battle).
 - Save/load already works from the escape menu recipes; the Geoscape's Options button opens the same `PauseState`.
 - TFTD-only paths (water-only craft) can be ignored.

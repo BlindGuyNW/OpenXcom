@@ -4,6 +4,8 @@ An audit of where the accessibility layer assumes vanilla OpenXcom and OXCE disa
 
 Work it top to bottom. Tick items off as they're fixed and played.
 
+Status, re-checked against the code 2026-10-06: every unticked item is still open. Items 1 and 2's fixes, the sea-loss line and wings are in but not yet heard in play (apart from the sort combos).
+
 ## Systemic causes
 
 1. [ ] **Clicks bypass the game's visibility gate** (verified). `InteractiveSurface::handle` ignores a surface that is `!_visible || _hidden` (InteractiveSurface.cpp:108). `Controls::click` called `mousePress`/`mouseClick` directly, and OXCE hides buttons to forbid actions. Fix in, untested: `Controls::click`/`clickRow` and the combo and slider adjust refuse hidden surfaces, saying "unavailable". Still to do: explicit recipes should leave hidden widgets out, not list them (dogfight modes and minimize, craft info fixed weapons, the manufacture sell toggle).
@@ -16,13 +18,13 @@ Work it top to bottom. Tick items off as they're fixed and played.
    Not covered: OXCE's touch-button flags (`considerTouchButtons`); touch buttons are off on desktop.
 3. [ ] **Recipes assume vanilla layouts and flows.** See "Screens" below.
 4. [ ] **Backspace = right click, and OXCE gave right click new jobs.** Decide what Backspace does per screen. See "Backspace" below.
-5. [ ] **No generic fallback, and unclaimed keys reach OXCE features.** From the code, not yet seen in play: every recipe matches one state type (Screens.cpp `all()`), and with no match `Navigator::sync` returns before speaking (Navigator.cpp:170-171). Keys other than Ctrl+R all go to the game. The typing echo, warnings and dogfight status still speak; `Battle::update`/`Geo::update` stop while the state covers them. See "Keys" and "Uncovered screens".
+5. [ ] **No generic fallback, and unclaimed keys reach OXCE features.** From the code, not yet seen in play: every recipe matches one state type (Screens.cpp `all()`), and with no match `Navigator::sync` returns before speaking (Navigator.cpp:171-172). Keys other than Ctrl+R all go to the game. The typing echo, warnings and dogfight status still speak; `Battle::update`/`Geo::update` stop while the state covers them. See "Keys" and "Uncovered screens".
 
 ## Screens
 
 - [ ] **Base defense hangs** (verified). OXCE adds Start Firing and Skip Firing (BaseDefenseState.cpp:99-103). OK is hidden (:97), and the timer only starts in `btnStartClick` (:440-447), apart from missile UFOs (:191-201). The recipe wires only OK. With `showUfoPreviewInBaseDefense`, 3 preview rows come first (:164-176) and are cleared on Start (:443), so the tick's `said` count skips the first 3 shots.
 - [ ] **Alien containment columns** (verified). Rows are name, sell cost, count, removing, interrogation flag (ManageAlienContainmentState.cpp:262, 270, 615-616). The recipe reads cells 1, 2, 3 as held, removing and interrogation.
-- [ ] **Craft info** (verified). The weapon loop is `i < 2` (Screens.cpp:2363), but OXCE allows `WeaponMax` = 4. Fixed weapons have hidden slot buttons (CraftInfoState.cpp:445-448). Missing: the weapon enable/disable toggle (:606-627), "disabled" in the slot text (:418), Pilots (:102, 191) and the shield.
+- [ ] **Craft info** (verified). The weapon loop is `i < 2` (Screens.cpp:2582), but OXCE allows `WeaponMax` = 4. Fixed weapons have hidden slot buttons (CraftInfoState.cpp:445-448). Missing: the weapon enable/disable toggle (:606-627), "disabled" in the slot text (:418), Pilots (:102, 191) and the shield.
 - [ ] **Inventory name** (verified). The name is in the `TextEdit` `_txtName`; `_txtNameStatic` is hidden on desktop (InventoryState.cpp:198-205, Options.cpp:458). `firstText` returns "TUs 54" or similar, which affects the screen name and the prev/next state text. Missing: the armor, stats, templates, ground scroll and quick search buttons (:123-143).
 - [ ] **Stores** columns: quantity, size, space used (StoresState.cpp:144-148). The headers label size as space used. The sort arrows start as `ARROW_NONE`, so they're skipped. Enter opens ItemLocations, which is uncovered.
 - [ ] **Soldiers** rows say only the name (`tableScreen(..., {})`). OXCE's action combo `_cbxScreenActions` (SoldiersState.cpp:137-179, 656-690) pushes a screen on every Left/Right step and is unlabelled.
@@ -32,7 +34,7 @@ Work it top to bottom. Tick items off as they're fixed and played.
 - [ ] **Item articles**: ammo is named from `getCompatibleAmmoForSlot(0)[i]`. OXCE uses the page's slot and compacts unavailable ammo (ArticleStateItem.cpp:195-198, 395-417). The melee row of a melee item is skipped. Weight, accuracy modifier and power bonus are ignored.
 - [ ] **Build facilities**: disabled facilities are appended (BuildFacilitiesState.cpp:164-180) and not said; Enter does nothing on them. The `SelectStartFacilityState`/`PlaceStartFacilityState` subclasses match our recipes but differ: OK is Reset, there are no costs or days, `isStartFacility` is true and placement is instant.
 - [ ] **Crew** refusals: OXCE tests `hasFullHealth()` (health and mana, Soldier.cpp:1091-1117), not `getWoundRecoveryInt`. OXCE's own `ErrorMessageState` refusals get an extra "craft full" from us. The Preview button starts a craft-deployment preview battle.
-- [ ] **SkillMenuState** (skills mods) matches the action menu recipe, whose name dereferences a weapon that can be null there (SkillMenuState.cpp:125). That's an access violation, which the try/catch won't catch.
+- [ ] **SkillMenuState** (skills mods only; not reachable with the current setup) matches the action menu recipe, whose name dereferences a weapon that can be null there (SkillMenuState.cpp:125). That's an access violation, which the try/catch won't catch.
 - [ ] **New manufacture list**: the filter combo is labelled with the title (`labelFor`). Unlabelled combos: crew sort, craft armor, craft equipment filter, ufopaedia select filter, new research sort.
 - [ ] **Place lift** with several lift types (mods): the lift list comes first (PlaceLiftState.cpp:99-130) and is ignored.
 - [ ] **Select destination** leaves out bases and friendly craft (Globe.cpp:785-808).
@@ -52,7 +54,7 @@ All silent unless noted:
 
 ## Battle
 
-- [ ] **Reserve check arguments** (verified). `checkReservedTU(before, cost, true)` (Battle.cpp:749) hits OXCE's `(bu, tu, energy, justChecking=false)`, so it can fire real reserve warnings. The preview's yellow test swaps in the autoshot reserve when it's none and passes energy with `justChecking=true` (Pathfinding.cpp:1248-1310). Mirror that.
+- [ ] **Reserve check arguments** (verified). `checkReservedTU(before, cost, true)` (Battle.cpp:751) hits OXCE's `(bu, tu, energy, justChecking=false)`, so it can fire real reserve warnings. The preview's yellow test swaps in the autoshot reserve when it's none and passes energy with `justChecking=true` (Pathfinding.cpp:1248-1310). Mirror that.
 - [ ] Path cost ignores stamina, which also turns the path red, and turn-before-first-step (Pathfinding.cpp:1229-1247).
 - [ ] **Psi is narrated as "missed"** (verified). Psi sets `_power = 0` even on success (ExplosionBState.cpp:130-141), so `hit` returns early (TileEngine.cpp:3228-3231). `_reportShot` isn't reset on the non-area branch of `endImpact`.
 - [ ] A bullet into a body on the floor says "missed, hit floor" (TileEngine.cpp:3239-3250). Shotgun pellets 2+ fall outside the bracket (ProjectileFlyBState.cpp:824).
@@ -60,7 +62,7 @@ All silent unless noted:
 - [ ] Out-of-range Blaster waypoint: OXCE warns out of range (BattlescapeGame.cpp:1737-1741), and we then say "waypoints full".
 - [ ] Enter on a tile with a visible non-allied unit (not aiming) speaks the stale preview (BattlescapeGame.cpp:1938-1950).
 - [ ] Civilians say "out of view" while aiming: only hostiles are in the visible list (TileEngine.cpp:1494-1496).
-- [ ] `outOfViewReason` approximates. The dark threshold is per unit (armour, camouflage, anti-camouflage, burning targets), smoke is graded, and psi vision sees all (TileEngine.cpp:1722-1910).
+- [ ] `outOfViewReason` approximates (it still hard-codes `dist > 9` for the dark test, Battle.cpp:556). The dark threshold is per unit (armour, camouflage, anti-camouflage, burning targets), smoke is graded, and psi vision sees all (TileEngine.cpp:1722-1910).
 - [ ] Unconscious allies dying aren't narrated (`update` skips units that are out). The HUD's blue and purple indicators aren't surfaced.
 - [ ] Fire-confirm mode (off by default) and spray autoshot aren't handled.
 - [ ] Accuracy: the crosshair's per-tile accuracy (Map.cpp:1342-1410) shows only with options we don't use.
@@ -79,7 +81,7 @@ All silent unless noted:
 ## Keys
 
 - [ ] **F6 is OXCE's InstaSave** (Options.cpp:507), not free. Ctrl+R and Ctrl+L really are free.
-- [ ] Ctrl+E (our end turn) swallows OXCE's experience log; Ctrl+Shift+E its overview (BattlescapeState.cpp:2886-2895).
+- [ ] Ctrl+E (our end turn) swallows OXCE's experience log; Ctrl+Shift+E its overview (BattlescapeState.cpp:2886-2895). The layer's Ctrl branch ignores Shift (Battle.cpp:1178-1193), so Ctrl+Shift+L is also our Ctrl+L.
 - [ ] Left Shift swallowing in battle is vestigial: `keyBattlePrevUnit` defaults to none in OXCE (Options.cpp:325).
 - [ ] Inventory: digits load equipment layouts, Ctrl+digits save them (InventoryState.cpp:2124-2133).
 - [ ] X and Z on Sell, Transfer and crew lists sell, transfer or remove everything (Options.cpp:531-555).
