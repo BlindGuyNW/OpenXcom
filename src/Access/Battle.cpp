@@ -367,6 +367,15 @@ namespace
 		return joinComma(parts);
 	}
 
+	/// Whether a tile is the craft: an entrance tile, where soldiers must stand to escape an abort.
+	/// Base defense maps flag every base floor as an entrance (that's where soldiers deploy),
+	/// and aborting there loses the base wherever you stand, so there's no craft to name.
+	bool craftArea(SavedBattleGame *save, Tile *tile)
+	{
+		MapData *floor = tile->getMapData(O_FLOOR);
+		return floor && floor->getSpecialType() == START_POINT && save->getMissionType() != "STR_BASE_DEFENSE";
+	}
+
 	/// The tile's own contents: object, lift, craft or exit area, smoke and fire. The floor is named last, by describeTile.
 	std::vector<std::string> terrainParts(SavedBattleGame *save, Tile *tile, Position p, bool full)
 	{
@@ -378,7 +387,7 @@ namespace
 		if (!objectName.empty())
 		{
 			parts.push_back(objectName);
-			if (full && tile->getTUCost(O_OBJECT, MT_WALK) >= 255)
+			if (tile->getTUCost(O_OBJECT, MT_WALK) >= 255)
 				parts.push_back(Vocab::get(Vocab::IMPASSABLE));
 		}
 		else if (object)
@@ -401,7 +410,7 @@ namespace
 		MapData *floor = tile->getMapData(O_FLOOR);
 		if (floor && floor->isGravLift())
 			parts.push_back(Vocab::get(Vocab::LIFT));
-		if (floor && floor->getSpecialType() == START_POINT)
+		if (craftArea(save, tile))
 			parts.push_back(Vocab::get(Vocab::CRAFT_AREA));
 		if (floor && floor->getSpecialType() == END_POINT)
 			parts.push_back(Vocab::get(Vocab::EXIT_AREA));
@@ -904,7 +913,7 @@ namespace
 					MapData *floor = tile->getMapData(O_FLOOR);
 					// Entrance tiles (the craft) are where soldiers must stand to escape an abort;
 					// exit tiles only lead to the next stage of a multi-stage mission.
-					if (floor && floor->getSpecialType() == START_POINT)
+					if (craftArea(save, tile))
 						out.push_back({ Vocab::get(Vocab::CRAFT_AREA), tile->getPosition(), 0, 0 });
 					else if (floor && floor->getSpecialType() == END_POINT)
 						out.push_back({ Vocab::get(Vocab::EXIT_AREA), tile->getPosition(), 0, 0 });
