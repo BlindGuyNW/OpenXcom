@@ -100,7 +100,7 @@ All silent unless noted:
 
 Re-audited 2026-10-06 against every `State` subclass, for the setup in use: only the `xcom1` ruleset, `oxceLinks` off, `customInitialBase` off. Several vanilla screens were missing from the first list.
 
-Recipes added 2026-10-06, untested: Infobox (battle timed messages: panicked, berserk, under alien control, mind control and morale attack successful, killed; every key goes to the game, which closes it), InfoboxOK (died from a fatal wound, unconscious, mission complete text), ConfirmEndMission (fatal wounds left when the battle ends), NewPossiblePurchase, NewPossibleCraft, NewPossibleFacility.
+Recipes added 2026-10-06, untested: Infobox (battle timed messages: panicked, berserk, under alien control, mind control and morale attack successful, killed; every key goes to the game, which closes it), InfoboxOK (died from a fatal wound, unconscious, mission complete text), ConfirmEndMission (fatal wounds left when the battle ends), NewPossiblePurchase, NewPossibleCraft, NewPossibleFacility, ModList and ModConfirmExtended (the mods menu; mod-specific screens stay parked).
 
 Next, in a plain campaign:
 - [x] MonthlyReport (played 2026-10-06, through to game over): title on arrival, one item per figure and per paragraph of the council text (`getLines`), OK its own stop; the tick says the failure message. Then the lose slideshow (each caption as it shows; keys go to the game) and Statistics (a list; also the Memorial's Statistics button). PsiTraining follows the report with a Psi Lab and is still uncovered.
@@ -111,7 +111,7 @@ Next, in a plain campaign:
 
 Later in a campaign: AllocatePsiTraining and TrainingFinished (Psi Lab), SoldierDiary overview, performance and mission (soldier info's Diary button), Scanner (motion scanner item, blips only: needs a parity design), the tech tree viewers, the Global research, manufacture and containment screens, UfoTracker, Notes, StatsForNerds, TurnDiary and the hit log (Ctrl+H, an Infobox, now read), ExperienceOverview, AlienInventory, SelectMusicTrack, the inventory and craft-equipment template dialogs, BriefingLight.
 
-Not reachable with this setup: GeoscapeEvent, pilots, transformations, SkillMenu, SoldierBonus (mods); the Extended links menus (`oxceLinks`); SelectStartFacility and PlaceStartFacility (`customInitialBase`); ModList (not needed); MiniMap (the cursor replaces it); TFTD, unit and soldier articles (not in `xcom1`, probably).
+Not reachable with this setup: GeoscapeEvent, pilots, transformations, SkillMenu, SoldierBonus (mods); the Extended links menus (`oxceLinks`); SelectStartFacility and PlaceStartFacility (`customInitialBase`); MiniMap (the cursor replaces it); TFTD, unit and soldier articles (not in `xcom1`, probably).
 
 ## Checked and fine
 

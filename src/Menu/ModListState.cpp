@@ -259,6 +259,11 @@ void ModListState::lstModsClick(Action *action)
 		return;
 	}
 
+	tryToggleMod();
+}
+
+void ModListState::tryToggleMod()
+{
 	std::pair<std::string, bool> &mod(_mods.at(_lstMods->getSelectedRow()));
 
 	// when activating a mod, check if it requires OXCE
@@ -456,6 +461,29 @@ void ModListState::moveModDown(Action *action, unsigned int row, bool max)
 		_moveBelow(_mods.at(row), _mods.at(row + 1));
 		lstModsRefresh(_lstMods->getScroll());
 	}
+	Options::reload = true;
+}
+
+const ModInfo *ModListState::getSelectedMaster() const
+{
+	return _masters.empty() ? nullptr : _masters.at(_cbxMasters->getSelected());
+}
+
+void ModListState::moveModByKey(size_t row, int dir, bool max)
+{
+	if (row >= _mods.size() || (dir < 0 && row == 0) || (dir > 0 && row + 1 >= _mods.size()))
+	{
+		return;
+	}
+	if (dir < 0)
+	{
+		_moveAbove(_mods.at(row), _mods.at(max ? 0 : row - 1));
+	}
+	else
+	{
+		_moveBelow(_mods.at(row), max ? _mods.back() : _mods.at(row + 1));
+	}
+	lstModsRefresh(_lstMods->getScroll());
 	Options::reload = true;
 }
 

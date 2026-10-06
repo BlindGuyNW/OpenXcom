@@ -56,6 +56,9 @@
 #include "../Menu/OptionsFoldersState.h"
 #include "../Menu/OptionsDefaultsState.h"
 #include "../Menu/OptionsConfirmState.h"
+#include "../Menu/ModListState.h"
+#include "../Menu/ModConfirmExtendedState.h"
+#include "../Engine/ModInfo.h"
 #include "../Engine/OptionInfo.h"
 #include "../Geoscape/AlienBaseState.h"
 #include "../Geoscape/BaseNameState.h"
@@ -2665,6 +2668,109 @@ AccessScreen unitInfo()
 	return s;
 }
 
+/// The current row of a mod in the mods screen, which moves as the load order changes.
+size_t modRow(ModListState *ml, const std::string &id)
+{
+	const std::vector<std::pair<std::string, bool> > &mods = ml->getMods();
+	for (size_t i = 0; i < mods.size(); ++i)
+	{
+		if (mods[i].first == id)
+			return i;
+	}
+	return NO_ROW;
+}
+
+/// Mods (main menu), wired explicitly: the row's click handler ignores clicks in its arrow column and
+/// the arrows warp the mouse, so the layer calls keyboard entry points on ModListState. Says "Mods", the
+/// base game and how many of its mods are on; then the base game combo, the mods ("X-Com Files, on":
+/// Enter toggles, asking first when the mod wants another version; Left/Right move it up or down the
+/// load order like the game's row arrows, Shift five places, Ctrl to the top or bottom, each move saying
+/// "load order 3 of 12"; Space reads version, author and description), then OK (restarts the game when
+/// anything changed) and Cancel. Escape is the game's Cancel.
+AccessScreen modList()
+{
+	AccessScreen s;
+	s.key = "modList";
+	s.isActive = is<ModListState>;
+	s.name = [](State *state)
+	{
+		ModListState *ml = static_cast<ModListState *>(state);
+		std::string text = std::string(state->tr("STR_MODS"));
+		if (const ModInfo *master = ml->getSelectedMaster())
+			text += ". " + Vocab::format(Vocab::HEADED_CELL, { std::string(state->tr("STR_BASE_GAME")), master->getName() });
+		const std::vector<std::pair<std::string, bool> > &mods = ml->getMods();
+		int on = (int)std::count_if(mods.begin(), mods.end(), [](const std::pair<std::string, bool> &m) { return m.second; });
+		text += ". " + (mods.empty() ? Vocab::get(Vocab::MODS_NONE) : Vocab::format(Vocab::MODS_ON, { std::to_string(on), std::to_string(mods.size()) }));
+		return text;
+	};
+	s.build = [](GraphBuilder &b, State *state)
+	{
+		ModListState *ml = static_cast<ModListState *>(state);
+		b.BeginStop("master");
+		ComboBox *cbx = ml->getMasterCombo();
+		NodeVtable master = Controls::comboBox(state, cbx, std::string(state->tr("STR_BASE_GAME")));
+		master.OnTooltip = [ml]
+		{
+			if (const ModInfo *info = ml->getSelectedMaster())
+				Speech::say(ml->makeTooltip(*info), true);
+		};
+		b.AddItem(ControlId::Referenced(cbx, "master"), master);
+
+		b.BeginStop("mods");
+		TextList *list = ml->getModList();
+		const std::vector<std::pair<std::string, bool> > &mods = ml->getMods();
+		if (mods.empty())
+		{
+			NodeVtable none;
+			none.Announcements.push_back(NodeAnnouncement([] { return Vocab::get(Vocab::MODS_NONE); }, false, AnnouncementKinds::Label));
+			b.AddItem(ControlId::Referenced(list, "mods:none"), none);
+		}
+		for (const std::pair<std::string, bool> &mod : mods)
+		{
+			std::string id = mod.first;
+			std::function<std::string()> onOff = [ml, id]
+			{
+				size_t row = modRow(ml, id);
+				return Vocab::get(row != NO_ROW && ml->getMods()[row].second ? Vocab::ON : Vocab::OFF);
+			};
+			// After a move the feedback is the new place in the load order; after a toggle, on or off.
+			std::shared_ptr<bool> moved = std::make_shared<bool>(false);
+			NodeVtable v;
+			v.Announcements.push_back(NodeAnnouncement([id] { return Options::getModInfos().at(id).getName(); }, false, AnnouncementKinds::Label));
+			v.Announcements.push_back(NodeAnnouncement(onOff, false, "pressed"));
+			v.OnActivate = [ml, list, id]
+			{
+				size_t row = modRow(ml, id);
+				if (row == NO_ROW)
+					return;
+				list->setSelectedRow(row);
+				ml->tryToggleMod();
+			};
+			v.OnAdjust = [ml, id, moved](int sign, bool large)
+			{
+				bool max = std::abs(sign) >= Controls::ADJUST_LIMIT;
+				for (int i = 0; i < (max || !large ? 1 : 5); ++i)
+					ml->moveModByKey(modRow(ml, id), sign, max);
+				*moved = true;
+			};
+			v.StateText = [ml, id, moved, onOff]
+			{
+				if (!*moved)
+					return onOff();
+				*moved = false;
+				return Vocab::format(Vocab::MOD_ORDER, { std::to_string(modRow(ml, id) + 1), std::to_string(ml->getMods().size()) });
+			};
+			v.OnTooltip = [ml, id] { Speech::say(ml->makeTooltip(Options::getModInfos().at(id)), true); };
+			b.AddItem(ControlId::Referenced(list, "mod:" + id), v);
+		}
+
+		b.BeginStop("buttons");
+		b.AddItem(ControlId::Referenced(ml->getOkButton(), "ok"), Controls::textButton(state, ml->getOkButton()));
+		b.AddItem(ControlId::Referenced(ml->getCancelButton(), "cancel"), Controls::textButton(state, ml->getCancelButton()));
+	};
+	return s;
+}
+
 /// Funding (F): the title, then "sort by COUNTRY", "sort by FUNDING", "sort by CHANGE" (the active one
 /// says its order; Enter sorts, again to reverse), the countries ("Brazil, FUNDING: $600,000, CHANGE:
 /// +$20,000") and the total, then OK. The game shows the sort only as an arrow on the active column.
@@ -3393,6 +3499,8 @@ const std::vector<AccessScreen> &all()
 		options(),
 		simpleScreen("optionsDefaults", is<OptionsDefaultsState>),
 		simpleScreen("optionsConfirm", is<OptionsConfirmState>),
+		modList(),
+		popupScreen("modConfirm", is<ModConfirmExtendedState>),
 		newGame(),
 		buildNewBase(),
 		simpleScreen("baseName", is<BaseNameState>),

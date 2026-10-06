@@ -301,6 +301,9 @@ namespace Vocab
 		KEY_WAITING,
 		STAT_OF,
 		STAT_STUN,
+		MODS_ON,
+		MOD_ORDER,
+		MODS_NONE,
 		COUNT
 	};
 

@@ -84,6 +84,18 @@ public:
 	void btnOpenFolderClick(Action *action);
 	/// Handler for clicking the Cancel button.
 	void btnCancelClick(Action *action);
+	/// Toggles the selected mod, asking first if it needs another version.
+	void tryToggleMod();
+
+	// Accessibility layer: keyboard entry points that don't depend on the mouse position.
+	ComboBox *getMasterCombo() const { return _cbxMasters; }
+	const ModInfo *getSelectedMaster() const;
+	TextList *getModList() const { return _lstMods; }
+	TextButton *getOkButton() const { return _btnOk; }
+	TextButton *getCancelButton() const { return _btnCancel; }
+	const std::vector< std::pair<std::string, bool> > &getMods() const { return _mods; }
+	/// Moves a mod one place up (dir < 0) or down, or to the top or bottom, without warping the mouse.
+	void moveModByKey(size_t row, int dir, bool max);
 };
 
 }

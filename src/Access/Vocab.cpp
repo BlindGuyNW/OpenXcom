@@ -298,6 +298,9 @@ namespace
 		"press the new key for {0}",
 		"{0} of {1}",
 		"stun {0}",
+		"{0} of {1} mods on",
+		"load order {0} of {1}",
+		"no mods for this base game",
 	};
 }
 
