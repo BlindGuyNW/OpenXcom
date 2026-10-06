@@ -1,5 +1,8 @@
 // Terrain piece names: { set, index, name }. Labelled by eye from the vanilla sprites;
 // pieces with nothing drawn are left out. Fix a name here and rebuild.
+// OXCE replaces some sets with patched copies (bin/standard/xcom1/TERRAIN). Only LIGHTNIN
+// changed its pieces: 41 to 46 follow OXCE's version, and 43 to 46 are invisible collision
+// shapes along the slanted hull, named because the hull is drawn across those tiles.
 // AVENGER
 { "AVENGER", 0, "craft roof" },
 { "AVENGER", 1, "craft roof" },
@@ -438,7 +441,12 @@
 { "LIGHTNIN", 38, "stairs" },
 { "LIGHTNIN", 39, "stairs" },
 { "LIGHTNIN", 40, "sliding door" },
-{ "LIGHTNIN", 41, "craft engine" },
+{ "LIGHTNIN", 41, "open sliding door" },
+{ "LIGHTNIN", 42, "craft engine" },
+{ "LIGHTNIN", 43, "hull edge" },
+{ "LIGHTNIN", 44, "hull edge" },
+{ "LIGHTNIN", 45, "hull edge" },
+{ "LIGHTNIN", 46, "hull edge" },
 // MARS
 { "MARS", 0, "Martian soil" },
 { "MARS", 1, "Martian soil" },
