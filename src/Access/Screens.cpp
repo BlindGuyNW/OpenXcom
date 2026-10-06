@@ -75,6 +75,9 @@
 #include "../Geoscape/NewPossiblePurchaseState.h"
 #include "../Geoscape/NewPossibleCraftState.h"
 #include "../Geoscape/NewPossibleFacilityState.h"
+#include "../Geoscape/MonthlyReportState.h"
+#include "../Menu/SlideshowState.h"
+#include "../Menu/StatisticsState.h"
 #include "../Geoscape/ProductionCompleteState.h"
 #include "../Geoscape/ResearchCompleteState.h"
 #include "../Geoscape/ResearchRequiredState.h"
@@ -3170,6 +3173,84 @@ AccessScreen optionsControls()
 	return s;
 }
 
+/// The monthly report: says the title on arrival; the report stop has one item per figure (month,
+/// rating, income, bonus, maintenance, balance) and per paragraph of the council's text (verdict,
+/// pleased, unhappy, pacts); OK is its own stop. On a failed month OK doesn't close it: it swaps the
+/// text for the game-over message, which the tick says.
+AccessScreen monthlyReport()
+{
+	AccessScreen s = simpleScreen("monthlyReport", is<MonthlyReportState>);
+	s.name = [](State *state) { return static_cast<MonthlyReportState *>(state)->getTitle()->getText(); };
+	s.build = [](GraphBuilder &b, State *state)
+	{
+		b.BeginStop("report");
+		std::vector<Text *> lines = static_cast<MonthlyReportState *>(state)->getLines();
+		for (size_t i = 0; i < lines.size(); ++i)
+		{
+			Text *text = lines[i];
+			if (!text->getVisible())
+				continue;
+			// The description holds paragraphs separated by blank lines.
+			std::vector<std::string> paragraphs;
+			std::string all = text->getText(), current;
+			for (char c : all + "\n")
+			{
+				if (c != '\n')
+					current += c;
+				else if (!current.empty())
+				{
+					paragraphs.push_back(current);
+					current.clear();
+				}
+			}
+			for (size_t p = 0; p < paragraphs.size(); ++p)
+			{
+				std::string line = paragraphs[p];
+				NodeVtable v;
+				v.Announcements.push_back(NodeAnnouncement([line] { return line; }, false, AnnouncementKinds::Label));
+				b.AddItem(ControlId::Referenced(text, "line:" + std::to_string(i) + ":" + std::to_string(p)), v);
+			}
+		}
+		b.BeginStop("buttons");
+		addWidgets(b, state);
+	};
+	s.tick = [](State *state)
+	{
+		static State *watched = 0;
+		static bool failed = false;
+		bool now = static_cast<MonthlyReportState *>(state)->isFailureShown();
+		if (state == watched && now && !failed)
+			Speech::say(allText(state), true);
+		watched = state;
+		failed = now;
+	};
+	return s;
+}
+
+/// A slideshow (the win and lose endings): says each slide's caption as it appears. The game moves on
+/// by itself (30 seconds a slide in UFO Defense) or on Enter, and Escape skips the rest, so every key
+/// goes to the game.
+AccessScreen slideshow()
+{
+	AccessScreen s;
+	s.key = "slideshow";
+	s.isActive = is<SlideshowState>;
+	s.name = allText;
+	s.build = [](GraphBuilder &, State *) {};
+	s.passKeys = [](State *) { return true; };
+	s.tick = [](State *state)
+	{
+		static State *watched = 0;
+		static std::string caption;
+		std::string now = allText(state);
+		if (state == watched && now != caption)
+			Speech::say(now, true);
+		watched = state;
+		caption = now;
+	};
+	return s;
+}
+
 /// The battle's timed message box ("X has panicked", "Mind control successful"): says the message,
 /// queued so it follows the narration. Any key closes it, so every key goes to the game. It closes
 /// itself after two seconds; the speech carries on. A sound-only box has no visible text and says nothing.
@@ -3232,6 +3313,9 @@ const std::vector<AccessScreen> &all()
 		popupScreen("newPossiblePurchase", is<NewPossiblePurchaseState>),
 		popupScreen("newPossibleCraft", is<NewPossibleCraftState>),
 		popupScreen("newPossibleFacility", is<NewPossibleFacilityState>),
+		monthlyReport(),
+		slideshow(),
+		simpleScreen("statistics", is<StatisticsState>),
 		popupScreen("productionComplete", is<ProductionCompleteState>),
 		popupScreen("itemsArriving", is<ItemsArrivingState>),
 		popupScreen("multipleTargets", is<MultipleTargetsState>),

@@ -311,6 +311,14 @@ MonthlyReportState::~MonthlyReportState()
 }
 
 /**
+ * Is the game-over message showing (after OK on a failed month)?
+ */
+bool MonthlyReportState::isFailureShown() const
+{
+	return _txtFailure->getVisible();
+}
+
+/**
  * Returns to the previous screen.
  * @param action Pointer to an action.
  */

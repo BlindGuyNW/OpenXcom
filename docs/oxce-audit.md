@@ -101,12 +101,12 @@ Re-audited 2026-10-06 against every `State` subclass, for the setup in use: only
 Recipes added 2026-10-06, untested: Infobox (battle timed messages: panicked, berserk, under alien control, mind control and morale attack successful, killed; every key goes to the game, which closes it), InfoboxOK (died from a fatal wound, unconscious, mission complete text), ConfirmEndMission (fatal wounds left when the battle ends), NewPossiblePurchase, NewPossibleCraft, NewPossibleFacility.
 
 Next, in a plain campaign:
-- [ ] MonthlyReport (every month, and game over; GeoscapeState.cpp:2890). PsiTraining follows it.
+- [x] MonthlyReport (played 2026-10-06, through to game over): title on arrival, one item per figure and per paragraph of the council text (`getLines`), OK its own stop; the tick says the failure message. Then the lose slideshow (each caption as it shows; keys go to the game) and Statistics (a list; also the Memorial's Statistics button). PsiTraining follows the report with a Psi Lab and is still uncovered.
 - [ ] Funding (F, GeoscapeState.cpp:3170): a table. Graphs (G, :3125): a chart, needs a design.
 - [ ] UnitInfo: soldier stats from the rank button (BattlescapeState.cpp:1534), and after a mind probe (BattlescapeGame.cpp:1828).
 - [ ] ItemLocations (Enter on Stores, Purchase, Sell, Transfer).
 
-Later in a campaign: AllocatePsiTraining and TrainingFinished (Psi Lab), SoldierDiary overview, performance and mission (soldier info's Diary button), Scanner (motion scanner item, blips only: needs a parity design), Cutscene/Slideshow captions and Statistics (win, lose), the tech tree viewers, the Global research, manufacture and containment screens, UfoTracker, Notes, StatsForNerds, TurnDiary and the hit log (Ctrl+H, an Infobox, now read), ExperienceOverview, AlienInventory, SelectMusicTrack, the inventory and craft-equipment template dialogs, BriefingLight.
+Later in a campaign: AllocatePsiTraining and TrainingFinished (Psi Lab), SoldierDiary overview, performance and mission (soldier info's Diary button), Scanner (motion scanner item, blips only: needs a parity design), the tech tree viewers, the Global research, manufacture and containment screens, UfoTracker, Notes, StatsForNerds, TurnDiary and the hit log (Ctrl+H, an Infobox, now read), ExperienceOverview, AlienInventory, SelectMusicTrack, the inventory and craft-equipment template dialogs, BriefingLight.
 
 Not reachable with this setup: GeoscapeEvent, pilots, transformations, SkillMenu, SoldierBonus (mods); the Extended links menus (`oxceLinks`); SelectStartFacility and PlaceStartFacility (`customInitialBase`); ModList (not needed); MiniMap (the cursor replaces it); TFTD, unit and soldier articles (not in `xcom1`, probably).
 

@@ -59,6 +59,12 @@ public:
 	void btnOkClick(Action *action);
 	/// Calculate monthly scores.
 	void calculateChanges();
+	/// Is the game-over message showing (after OK on a failed month)?
+	bool isFailureShown() const;
+	/// Gets the title text.
+	Text *getTitle() const { return _txtTitle; }
+	/// Gets the report's texts in reading order: month, rating, income, bonus, maintenance, balance, description.
+	std::vector<Text *> getLines() const { return { _txtMonth, _txtRating, _txtIncome, _txtBonus, _txtMaintenance, _txtBalance, _txtDesc }; }
 };
 
 }
