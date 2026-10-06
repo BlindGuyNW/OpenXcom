@@ -89,6 +89,8 @@ namespace
 	/// The reserve settings last frame (F1 to F4, J).
 	BattleActionType _reserve = BA_NONE;
 	bool _kneelReserve = false;
+	/// Personal lighting last frame (L).
+	bool _lights = true;
 	/// Delete was pressed; say the result once the game has handled it.
 	bool _zeroPending = false;
 	/// The projectile in flight last frame, so each new shot is spoken once.
@@ -516,6 +518,8 @@ namespace
 			parts.push_back(reserveText(state, save->getTUReserved()));
 		if (save->getKneelReserved())
 			parts.push_back(state->tr("STR_RESERVE_TIME_UNITS_FOR_KNEEL"));
+		if (!save->getTileEngine()->getPersonalLighting())
+			parts.push_back(Vocab::format(Vocab::PERSONAL_LIGHTS, { Vocab::get(Vocab::OFF) }));
 		parts.push_back(Vocab::format(Vocab::FACING, { dirName(unit->getDirection()) }));
 		BattleItem *left = unit->getLeftHandWeapon(), *right = unit->getRightHandWeapon();
 		parts.push_back(Vocab::format(Vocab::RIGHT_HAND, { right ? itemText(state, right) : Vocab::get(Vocab::EMPTY) }));
@@ -1178,6 +1182,7 @@ namespace
 		_endTurnArmed = 0;
 		_reserve = save->getTUReserved();
 		_kneelReserve = save->getKneelReserved();
+		_lights = save->getTileEngine()->getPersonalLighting();
 		_zeroPending = false;
 		_cursor =Position(save->getMapSizeX() / 2, save->getMapSizeY() / 2, 0);
 		// Enter previews a move before making it, so the game's two-click move must be on.
@@ -1330,6 +1335,12 @@ void update(BattlescapeState *state)
 	{
 		_kneelReserve = save->getKneelReserved();
 		say(joinComma({ state->tr("STR_RESERVE_TIME_UNITS_FOR_KNEEL"), Vocab::get(_kneelReserve ? Vocab::ON : Vocab::OFF) }), true);
+	}
+	// Personal lighting, a reply to L (or the OXCE links menu's button).
+	if (save->getTileEngine()->getPersonalLighting() != _lights)
+	{
+		_lights = save->getTileEngine()->getPersonalLighting();
+		say(Vocab::format(Vocab::PERSONAL_LIGHTS, { Vocab::get(_lights ? Vocab::ON : Vocab::OFF) }), true);
 	}
 	if (_zeroPending)
 	{
