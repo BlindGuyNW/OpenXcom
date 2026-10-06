@@ -63,6 +63,10 @@ private:
 	Text *_txtTitle, *_txtCountry, *_txtFunding, *_txtChange;
 	TextList *_lstCountries;
 	ArrowButton *_sortName, *_sortFunding, *_sortChange;
+public:
+	/// Gets the sort arrows: country, funding, change.
+	std::vector<ArrowButton *> getSortButtons() const { return { _sortName, _sortFunding, _sortChange }; }
+private:
 
 	std::vector<FundingCountry> _fundingCountryList;
 	FundingCountrySort _fundingCountryOrder;

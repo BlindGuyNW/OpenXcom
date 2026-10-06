@@ -273,6 +273,8 @@ namespace
 		"Z to A",
 		"oldest first",
 		"newest first",
+		"lowest first",
+		"highest first",
 		"unavailable",
 		"added to wing, {0} in wing",
 		"removed from wing, {0} in wing",

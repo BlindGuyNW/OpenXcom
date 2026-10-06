@@ -78,6 +78,7 @@
 #include "../Geoscape/MonthlyReportState.h"
 #include "../Menu/SlideshowState.h"
 #include "../Menu/StatisticsState.h"
+#include "../Geoscape/FundingState.h"
 #include "../Geoscape/ProductionCompleteState.h"
 #include "../Geoscape/ResearchCompleteState.h"
 #include "../Geoscape/ResearchRequiredState.h"
@@ -2614,6 +2615,53 @@ AccessScreen tableScreen(const std::string &key, std::function<bool(State *)> is
 	return s;
 }
 
+/// Funding (F): the title, then "sort by COUNTRY", "sort by FUNDING", "sort by CHANGE" (the active one
+/// says its order; Enter sorts, again to reverse), the countries ("Brazil, FUNDING: $600,000, CHANGE:
+/// +$20,000") and the total, then OK. The game shows the sort only as an arrow on the active column.
+AccessScreen funding()
+{
+	static const std::vector<std::string> headers = { "STR_FUNDING", "STR_CHANGE" };
+	AccessScreen s = tableScreen("funding", is<FundingState>, headers);
+	s.build = [](GraphBuilder &b, State *state)
+	{
+		std::vector<ArrowButton *> sorts = static_cast<FundingState *>(state)->getSortButtons();
+		const char *columns[] = { "STR_COUNTRY", "STR_FUNDING", "STR_CHANGE" };
+		b.BeginStop("sort");
+		for (size_t i = 0; i < sorts.size(); ++i)
+		{
+			ArrowButton *btn = sorts[i];
+			bool byName = i == 0;
+			NodeVtable v = Controls::labelledButton(state, btn, Vocab::format(Vocab::SAVES_SORT_BY, { std::string(state->tr(columns[i])) }));
+			std::function<std::string()> order = [btn, byName]
+			{
+				switch (btn->getShape())
+				{
+				case ARROW_SMALL_UP: return Vocab::get(byName ? Vocab::SAVES_A_TO_Z : Vocab::SORT_LOWEST_FIRST);
+				case ARROW_SMALL_DOWN: return Vocab::get(byName ? Vocab::SAVES_Z_TO_A : Vocab::SORT_HIGHEST_FIRST);
+				default: return std::string();
+				}
+			};
+			v.Announcements.push_back(NodeAnnouncement(order, false, "pressed"));
+			v.StateText = order;
+			b.AddItem(ControlId::Referenced(btn, std::string("sort:") + columns[i]), v);
+		}
+		addWidgets(b, state, [state, sorts](Surface *surface, size_t row, NodeVtable &v)
+		{
+			if (std::find(sorts.begin(), sorts.end(), surface) != sorts.end())
+			{
+				v.Announcements.clear();
+				return;
+			}
+			TextList *list = dynamic_cast<TextList *>(surface);
+			if (!list || row == NO_ROW)
+				return;
+			v.Announcements.clear();
+			v.Announcements.push_back(NodeAnnouncement([state, list, row] { return headedRow(state, list, row, headers); }, false, AnnouncementKinds::Label));
+		});
+	};
+	return s;
+}
+
 /// A popup holding one short table: says its title and every row with its columns named on arrival,
 /// then lists the rows and buttons like tableScreen.
 AccessScreen tablePopup(const std::string &key, std::function<bool(State *)> isActive, const std::vector<std::string> &headers)
@@ -3316,6 +3364,7 @@ const std::vector<AccessScreen> &all()
 		monthlyReport(),
 		slideshow(),
 		simpleScreen("statistics", is<StatisticsState>),
+		funding(),
 		popupScreen("productionComplete", is<ProductionCompleteState>),
 		popupScreen("itemsArriving", is<ItemsArrivingState>),
 		popupScreen("multipleTargets", is<MultipleTargetsState>),
