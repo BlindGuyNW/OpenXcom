@@ -45,6 +45,18 @@
 #include "../Menu/ConfirmLoadState.h"
 #include "../Menu/ErrorMessageState.h"
 #include "../Menu/NewGameState.h"
+#include "../Menu/OptionsBaseState.h"
+#include "../Menu/OptionsVideoState.h"
+#include "../Menu/OptionsAudioState.h"
+#include "../Menu/OptionsNoAudioState.h"
+#include "../Menu/OptionsControlsState.h"
+#include "../Menu/OptionsGeoscapeState.h"
+#include "../Menu/OptionsBattlescapeState.h"
+#include "../Menu/OptionsAdvancedState.h"
+#include "../Menu/OptionsFoldersState.h"
+#include "../Menu/OptionsDefaultsState.h"
+#include "../Menu/OptionsConfirmState.h"
+#include "../Engine/OptionInfo.h"
 #include "../Geoscape/AlienBaseState.h"
 #include "../Geoscape/BaseNameState.h"
 #include "../Geoscape/BuildNewBaseState.h"
@@ -300,6 +312,161 @@ struct ArticleAccess
 			return false;
 		}
 		return true;
+	}
+};
+
+/**
+ * Reads the options screens: a friend of OptionsBaseState and each category, since their widgets
+ * are private and the two-column layout (categories on the left, settings in two columns) would
+ * scramble the positional heuristics.
+ */
+struct OptionsAccess
+{
+	/// A heading and what sits under it: combo boxes, sliders, toggles and text lines.
+	struct Section
+	{
+		Text *heading;
+		std::vector<Surface *> widgets;
+	};
+
+	static OptionsBaseState *base(State *state)
+	{
+		return static_cast<OptionsBaseState *>(state);
+	}
+
+	static std::vector<TextButton *> categories(State *state)
+	{
+		OptionsBaseState *o = base(state);
+		return { o->_btnVideo, o->_btnAudio, o->_btnControls, o->_btnGeoscape, o->_btnBattlescape, o->_btnAdvanced, o->_btnFolders };
+	}
+
+	static TextButton *category(State *state)
+	{
+		return base(state)->_group;
+	}
+
+	static std::vector<TextButton *> buttons(State *state)
+	{
+		OptionsBaseState *o = base(state);
+		return { o->_btnOk, o->_btnCancel, o->_btnDefault };
+	}
+
+	/// The resolution fields and arrows of the video options; false on other categories.
+	static bool resolution(State *state, Text *&heading, TextEdit *&width, TextEdit *&height, ArrowButton *&bigger, ArrowButton *&smaller)
+	{
+		OptionsVideoState *v = dynamic_cast<OptionsVideoState *>(state);
+		if (!v)
+			return false;
+		heading = v->_txtDisplayResolution;
+		width = v->_txtDisplayWidth;
+		height = v->_txtDisplayHeight;
+		bigger = v->_btnDisplayResolutionUp;
+		smaller = v->_btnDisplayResolutionDown;
+		return true;
+	}
+
+	/// The category's settings in reading order, left column first: each column runs top to bottom.
+	static std::vector<Section> sections(State *state)
+	{
+		if (OptionsVideoState *v = dynamic_cast<OptionsVideoState *>(state))
+		{
+			return {
+				{ v->_txtLanguage, { v->_cbxLanguage } },
+				{ v->_txtGeoScale, { v->_cbxGeoScale } },
+				{ v->_txtBattleScale, { v->_cbxBattleScale } },
+				{ v->_txtMode, { v->_cbxDisplayMode } },
+				{ v->_txtFilter, { v->_cbxFilter } },
+				{ v->_txtOptions, { v->_btnLetterbox, v->_btnLockMouse, v->_btnRootWindowedMode } },
+			};
+		}
+		if (OptionsAudioState *a = dynamic_cast<OptionsAudioState *>(state))
+		{
+			return {
+				{ a->_txtMusicVolume, { a->_slrMusicVolume } },
+				{ a->_txtSoundVolume, { a->_slrSoundVolume } },
+				{ a->_txtUiVolume, { a->_slrUiVolume } },
+				{ a->_txtOptions, { a->_btnBackgroundMute } },
+				{ a->_txtVideoFormat, { a->_cbxVideoFormat } },
+				{ a->_txtMusicFormat, { a->_cbxMusicFormat, a->_txtCurrentMusic } },
+				{ a->_txtSoundFormat, { a->_cbxSoundFormat, a->_txtCurrentSound } },
+			};
+		}
+		if (OptionsGeoscapeState *g = dynamic_cast<OptionsGeoscapeState *>(state))
+		{
+			return {
+				{ g->_txtScrollSpeed, { g->_slrScrollSpeed } },
+				{ g->_txtClockSpeed, { g->_slrClockSpeed } },
+				{ g->_txtGlobeDetails, { g->_btnGlobeCountries, g->_btnGlobeRadars, g->_btnGlobePaths } },
+				{ g->_txtDragScroll, { g->_cbxDragScroll } },
+				{ g->_txtDogfightSpeed, { g->_slrDogfightSpeed } },
+				{ g->_txtOptions, { g->_btnShowFunds } },
+			};
+		}
+		if (OptionsBattlescapeState *b = dynamic_cast<OptionsBattlescapeState *>(state))
+		{
+			return {
+				{ b->_txtEdgeScroll, { b->_cbxEdgeScroll } },
+				{ b->_txtScrollSpeed, { b->_slrScrollSpeed } },
+				{ b->_txtXcomSpeed, { b->_slrXcomSpeed } },
+				{ b->_txtPathPreview, { b->_btnArrows, b->_btnTuCost, b->_btnEnergyCost } },
+				{ b->_txtDragScroll, { b->_cbxDragScroll } },
+				{ b->_txtFireSpeed, { b->_slrFireSpeed } },
+				{ b->_txtAlienSpeed, { b->_slrAlienSpeed } },
+				{ b->_txtOptions, { b->_btnTooltips, b->_btnDeaths } },
+			};
+		}
+		if (OptionsFoldersState *f = dynamic_cast<OptionsFoldersState *>(state))
+		{
+			return {
+				{ f->_txtDataFolder, { f->_txtDataFolderPath1, f->_txtDataFolderPath2 } },
+				{ f->_txtUserFolder, { f->_txtUserFolderPath } },
+				{ f->_txtSaveFolder, { f->_txtSaveFolderPath } },
+				{ f->_txtConfigFolder, { f->_txtConfigFolderPath } },
+			};
+		}
+		if (OptionsNoAudioState *n = dynamic_cast<OptionsNoAudioState *>(state))
+		{
+			return { { 0, { n->_txtError } } };
+		}
+		return {};
+	}
+
+	/// The OXC and OXCE buttons above the advanced settings and key bindings (a third is hidden).
+	static std::vector<TextButton *> owners(State *state)
+	{
+		if (OptionsAdvancedState *a = dynamic_cast<OptionsAdvancedState *>(state))
+			return { a->_btnOXC, a->_btnOXCE, a->_btnOTHER };
+		if (OptionsControlsState *c = dynamic_cast<OptionsControlsState *>(state))
+			return { c->_btnOXC, c->_btnOXCE, c->_btnOTHER };
+		return {};
+	}
+
+	static TextList *advancedList(State *state)
+	{
+		return static_cast<OptionsAdvancedState *>(state)->_lstOptions;
+	}
+
+	/// The setting on a row of the advanced list; null on the section headings and spacers.
+	static OptionInfo *advancedSetting(State *state, size_t row)
+	{
+		return static_cast<OptionsAdvancedState *>(state)->getSetting(row);
+	}
+
+	static TextList *controlsList(State *state)
+	{
+		return static_cast<OptionsControlsState *>(state)->_lstControls;
+	}
+
+	/// The key binding on a row of the controls list; null on the section headings and spacers.
+	static OptionInfo *control(State *state, size_t row)
+	{
+		return static_cast<OptionsControlsState *>(state)->getControl(row);
+	}
+
+	/// The row waiting for a new key, or -1.
+	static int waitingRow(State *state)
+	{
+		return static_cast<OptionsControlsState *>(state)->_selected;
 	}
 };
 
@@ -2696,6 +2863,307 @@ AccessScreen newPossibleResearch()
 	return s;
 }
 
+/// A widget's game tooltip (the options' descriptions), spoken on Space.
+void addTooltip(State *state, Surface *surface, NodeVtable &v)
+{
+	InteractiveSurface *widget = dynamic_cast<InteractiveSurface *>(surface);
+	if (!widget || widget->getTooltip().empty())
+		return;
+	std::string text = state->tr(widget->getTooltip());
+	v.OnTooltip = [text] { Speech::say(text, true); };
+}
+
+/// "VIDEO options": the category showing.
+std::string optionsName(State *state)
+{
+	TextButton *category = OptionsAccess::category(state);
+	return category ? Vocab::format(Vocab::OPTIONS_NAME, { category->getText() }) : std::string();
+}
+
+/// The categories down the left, as the first stop. The one showing is where the stop lands,
+/// so focus stays on it when Enter switches category (each category is a new state).
+void addOptionCategories(GraphBuilder &b, State *state)
+{
+	b.BeginStop("categories");
+	for (TextButton *btn : OptionsAccess::categories(state))
+	{
+		if (!btn->getVisible())
+			continue;
+		NodeVtable v = Controls::textButton(state, btn);
+		for (NodeAnnouncement &a : v.Announcements)
+		{
+			if (a.Kind == "pressed")
+				a.Kind = AnnouncementKinds::Selected;
+		}
+		b.AddItem(ControlId::ForObject(btn), v);
+	}
+}
+
+/// OK, Cancel and Restore Defaults, the last stop.
+void addOptionButtons(GraphBuilder &b, State *state)
+{
+	b.BeginStop("buttons");
+	for (TextButton *btn : OptionsAccess::buttons(state))
+	{
+		if (btn->getVisible())
+			b.AddItem(ControlId::ForObject(btn), Controls::textButton(state, btn));
+	}
+}
+
+/// One heading's settings. A lone combo box or slider takes the heading as its label
+/// ("Music volume, 75 percent"); toggle groups and folder paths sit under it as their context.
+void addOptionSection(GraphBuilder &b, State *state, const OptionsAccess::Section &section)
+{
+	std::vector<Surface *> shown;
+	int labelled = 0;
+	for (Surface *w : section.widgets)
+	{
+		if (!w || !w->getVisible())
+			continue;
+		Text *text = dynamic_cast<Text *>(w);
+		if (text && text->getText().empty())
+			continue;
+		if (dynamic_cast<ComboBox *>(w) || dynamic_cast<Slider *>(w))
+			++labelled;
+		shown.push_back(w);
+	}
+	if (shown.empty())
+		return;
+	std::string heading = section.heading ? section.heading->getText() : std::string();
+	bool context = labelled != 1 && !heading.empty();
+	if (context)
+		b.PushContext(heading);
+	for (Surface *w : shown)
+	{
+		NodeVtable v;
+		if (ComboBox *box = dynamic_cast<ComboBox *>(w))
+			v = Controls::comboBox(state, box, heading);
+		else if (Slider *slider = dynamic_cast<Slider *>(w))
+			v = Controls::slider(state, slider, heading);
+		else if (TextButton *btn = dynamic_cast<TextButton *>(w))
+			v = Controls::textButton(state, btn);
+		else if (Text *text = dynamic_cast<Text *>(w))
+		{
+			v.Announcements.push_back(NodeAnnouncement([text] { return text->getText(); }, false, AnnouncementKinds::Label));
+			// The folder paths (the texts with tooltips) open in Explorer when clicked.
+			if (!text->getTooltip().empty())
+				v.OnActivate = [state, text] { Controls::click(state, text); };
+		}
+		addTooltip(state, w, v);
+		b.AddItem(ControlId::ForObject(w), v);
+	}
+	if (context)
+		b.PopContext();
+}
+
+/// The video options' resolution: width and height fields ("width, 1280, edit"), then the
+/// arrows, each saying the new resolution ("1280 by 800").
+void addResolution(GraphBuilder &b, State *state)
+{
+	Text *heading;
+	TextEdit *width, *height;
+	ArrowButton *bigger, *smaller;
+	if (!OptionsAccess::resolution(state, heading, width, height, bigger, smaller))
+		return;
+	b.PushContext(heading->getText());
+	std::pair<TextEdit *, Vocab::Id> edits[] = { { width, Vocab::RES_WIDTH }, { height, Vocab::RES_HEIGHT } };
+	for (const std::pair<TextEdit *, Vocab::Id> &edit : edits)
+	{
+		NodeVtable v = Controls::textEdit(state, edit.first);
+		// The field's text is its value; its name goes first.
+		v.Announcements[0].Kind = AnnouncementKinds::Value;
+		std::string label = Vocab::get(edit.second);
+		v.Announcements.push_back(NodeAnnouncement([label] { return label; }, false, AnnouncementKinds::Label));
+		b.AddItem(ControlId::ForObject(edit.first), v);
+	}
+	std::function<std::string()> value = [width, height]
+	{
+		return Vocab::format(Vocab::RES_VALUE, { width->getText(), height->getText() });
+	};
+	std::pair<ArrowButton *, Vocab::Id> arrows[] = { { bigger, Vocab::RES_BIGGER }, { smaller, Vocab::RES_SMALLER } };
+	for (const std::pair<ArrowButton *, Vocab::Id> &arrow : arrows)
+	{
+		if (!arrow.first->getVisible())
+			continue;
+		NodeVtable v = Controls::labelledButton(state, arrow.first, Vocab::get(arrow.second));
+		v.StateText = value;
+		b.AddItem(ControlId::ForObject(arrow.first), v);
+	}
+	b.PopContext();
+}
+
+/// The options categories laid out in sections: categories, settings, then OK, Cancel and Restore Defaults.
+/// Covers video, audio (or the no-audio notice), Geoscape, Battlescape and folders; the advanced
+/// settings and key bindings have recipes of their own, matched first.
+AccessScreen options()
+{
+	AccessScreen s;
+	s.key = "options";
+	s.isActive = is<OptionsBaseState>;
+	s.name = optionsName;
+	s.build = [](GraphBuilder &b, State *state)
+	{
+		addOptionCategories(b, state);
+		b.BeginStop("settings");
+		addResolution(b, state);
+		for (const OptionsAccess::Section &section : OptionsAccess::sections(state))
+			addOptionSection(b, state, section);
+		addOptionButtons(b, state);
+	};
+	return s;
+}
+
+/// The OXC and OXCE buttons that switch the advanced settings and key bindings, a stop of their own.
+void addOptionOwners(GraphBuilder &b, State *state)
+{
+	b.BeginStop("owners");
+	for (TextButton *btn : OptionsAccess::owners(state))
+	{
+		if (btn->getVisible())
+			b.AddItem(ControlId::ForObject(btn), Controls::textButton(state, btn));
+	}
+}
+
+/// A settings list split at its headings (General, Geoscape, Basescape...): each heading starts
+/// a stop and is the context of the rows under it; the spacer rows are skipped.
+void addHeadedList(GraphBuilder &b, TextList *list, std::function<bool(size_t)> isItem, std::function<NodeVtable(size_t)> node)
+{
+	bool open = false;
+	for (size_t row = 0; row < list->getTexts(); ++row)
+	{
+		if (isItem(row))
+		{
+			b.AddItem(ControlId::Referenced(list, "row:" + std::to_string(row)), node(row));
+			continue;
+		}
+		std::string heading = Controls::cellText(list, row, 0);
+		if (heading.empty())
+			continue;
+		if (open)
+			b.PopContext();
+		b.BeginStop("section:" + std::to_string(row));
+		b.PushContext(heading);
+		open = true;
+	}
+	if (open)
+		b.PopContext();
+}
+
+/// An advanced setting: "Autosave, YES" or a number. Enter is the game's left click (a yes/no
+/// flips, a number goes up), Backspace its right click (a number goes down); Left/Right step
+/// numbers too. The game wraps numbers at their ends. Settings the mod fixes say so and don't change.
+NodeVtable advancedRow(State *state, TextList *list, size_t row)
+{
+	OptionInfo *setting = OptionsAccess::advancedSetting(state, row);
+	bool fixed = State::getGamePtr()->getMod()->getFixedUserOptions().count(setting->id()) > 0;
+	std::function<std::string()> value = [list, row, fixed]
+	{
+		std::string v = Controls::cellText(list, row, 1);
+		return fixed ? v + ", " + Vocab::get(Vocab::OPTION_FIXED) : v;
+	};
+	NodeVtable v;
+	v.Announcements.push_back(NodeAnnouncement([list, row] { return Controls::cellText(list, row, 0); }, false, AnnouncementKinds::Label));
+	v.Announcements.push_back(NodeAnnouncement(value, false, AnnouncementKinds::Value));
+	v.OnActivate = [state, list, row] { Controls::clickRow(state, list, row); };
+	v.OnSecondary = [state, list, row] { Controls::clickRow(state, list, row, SDL_BUTTON_RIGHT); };
+	if (setting->type() == OPTION_INT)
+	{
+		v.OnAdjust = [state, list, row](int sign, bool)
+		{
+			Controls::clickRow(state, list, row, sign > 0 ? SDL_BUTTON_LEFT : SDL_BUTTON_RIGHT);
+		};
+	}
+	v.StateText = value;
+	std::string description = state->tr(setting->description() + "_DESC");
+	v.OnTooltip = [description] { Speech::say(description, true); };
+	return v;
+}
+
+/// Advanced options: categories, the OXC/OXCE switch, one stop per section of settings, then the buttons.
+AccessScreen optionsAdvanced()
+{
+	AccessScreen s;
+	s.key = "optionsAdvanced";
+	s.isActive = is<OptionsAdvancedState>;
+	s.name = optionsName;
+	s.build = [](GraphBuilder &b, State *state)
+	{
+		addOptionCategories(b, state);
+		addOptionOwners(b, state);
+		TextList *list = OptionsAccess::advancedList(state);
+		addHeadedList(b, list,
+			[state](size_t row) { return OptionsAccess::advancedSetting(state, row) != 0; },
+			[state, list](size_t row) { return advancedRow(state, list, row); });
+		addOptionButtons(b, state);
+	};
+	return s;
+}
+
+/// A key binding: "Quick save, F6", or "no key". Enter starts rebinding (the game then takes the
+/// next key, whatever it is; see passKeys), Backspace clears the binding.
+NodeVtable keyRow(State *state, TextList *list, size_t row)
+{
+	std::function<std::string()> name = [list, row] { return Controls::cellText(list, row, 0); };
+	std::function<std::string()> key = [list, row]
+	{
+		std::string k = Controls::cellText(list, row, 1);
+		return k.empty() ? Vocab::get(Vocab::KEY_NONE) : k;
+	};
+	NodeVtable v;
+	v.Announcements.push_back(NodeAnnouncement(name, false, AnnouncementKinds::Label));
+	v.Announcements.push_back(NodeAnnouncement(key, false, AnnouncementKinds::Value));
+	v.OnActivate = [state, list, row] { Controls::clickRow(state, list, row); };
+	v.OnSecondary = [state, list, row] { Controls::clickRow(state, list, row, SDL_BUTTON_RIGHT); };
+	v.StateText = [state, row, name, key]
+	{
+		if (OptionsAccess::waitingRow(state) == (int)row)
+			return Vocab::format(Vocab::KEY_WAITING, { name() });
+		return name() + ", " + key();
+	};
+	addTooltip(state, list, v);
+	return v;
+}
+
+/// Key bindings: categories, the OXC/OXCE switch, one stop per section of keys, then the buttons.
+/// While a row waits for its new key the navigator stands down so the game gets that key,
+/// and the tick says the new binding once the game has taken it.
+AccessScreen optionsControls()
+{
+	AccessScreen s;
+	s.key = "optionsControls";
+	s.isActive = is<OptionsControlsState>;
+	s.name = optionsName;
+	s.build = [](GraphBuilder &b, State *state)
+	{
+		addOptionCategories(b, state);
+		addOptionOwners(b, state);
+		TextList *list = OptionsAccess::controlsList(state);
+		addHeadedList(b, list,
+			[state](size_t row) { return OptionsAccess::control(state, row) != 0; },
+			[state, list](size_t row) { return keyRow(state, list, row); });
+		addOptionButtons(b, state);
+	};
+	s.passKeys = [](State *state) { return OptionsAccess::waitingRow(state) != -1; };
+	s.tick = [](State *state)
+	{
+		static State *watched = 0;
+		static int waiting = -1;
+		int now = OptionsAccess::waitingRow(state);
+		if (state == watched && waiting != -1 && now == -1)
+		{
+			TextList *list = OptionsAccess::controlsList(state);
+			if ((size_t)waiting < list->getTexts())
+			{
+				std::string key = Controls::cellText(list, waiting, 1);
+				Speech::say(Controls::cellText(list, waiting, 0) + ", " + (key.empty() ? Vocab::get(Vocab::KEY_NONE) : key), true);
+			}
+		}
+		watched = state;
+		waiting = now;
+	};
+	return s;
+}
+
 const std::vector<AccessScreen> &all()
 {
 	static const std::vector<AccessScreen> screens = {
@@ -2721,6 +3189,11 @@ const std::vector<AccessScreen> &all()
 		simpleScreen("deleteGame", is<DeleteGameState>),
 		simpleScreen("confirmLoad", is<ConfirmLoadState>),
 		simpleScreen("errorMessage", is<ErrorMessageState>),
+		optionsAdvanced(),
+		optionsControls(),
+		options(),
+		simpleScreen("optionsDefaults", is<OptionsDefaultsState>),
+		simpleScreen("optionsConfirm", is<OptionsConfirmState>),
 		newGame(),
 		buildNewBase(),
 		simpleScreen("baseName", is<BaseNameState>),

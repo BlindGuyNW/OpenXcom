@@ -430,6 +430,16 @@ bool handleEvent(Game *game, const SDL_Event &ev)
 	if (ev.type != SDL_KEYDOWN)
 		return false;
 
+	// A screen waiting for a raw key (a new key binding) gets it untouched, Ctrl+R included.
+	sync();
+	if (_screen && _screen->passKeys)
+	{
+		bool pass = false;
+		guarded("passKeys", [&] { pass = _screen->passKeys(_state); });
+		if (pass)
+			return false;
+	}
+
 	SDLMod mod = ev.key.keysym.mod;
 	bool shift = (mod & KMOD_SHIFT) != 0, ctrl = (mod & KMOD_CTRL) != 0, alt = (mod & KMOD_ALT) != 0;
 	Controls::takeRefusal();

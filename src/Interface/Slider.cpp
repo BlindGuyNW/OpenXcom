@@ -263,6 +263,15 @@ int Slider::getMax() const
 }
 
 /**
+ * Returns whether the range runs high to low, left to right (accessibility).
+ * @return True if the left end is the larger value.
+ */
+bool Slider::isReversed() const
+{
+	return _min > _max;
+}
+
+/**
  * Runs the change handler, if any, with a blank action (accessibility).
  * @param state State the handler belongs to.
  */

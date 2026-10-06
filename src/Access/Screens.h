@@ -46,6 +46,9 @@ struct AccessScreen
 	std::function<void(State *)> back;
 	/// Called every frame while the recipe is attached, for narration that follows the game. Optional.
 	std::function<void(State *)> tick;
+	/// While this returns true the navigator stands down and every key goes to the game,
+	/// as for a focused text field: the key binding list waiting for its new key. Optional.
+	std::function<bool(State *)> passKeys;
 };
 
 namespace Screens

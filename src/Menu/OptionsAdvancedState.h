@@ -33,6 +33,7 @@ class TextList;
  */
 class OptionsAdvancedState : public OptionsBaseState
 {
+	friend struct OptionsAccess;
 private:
 	TextButton *_btnOXC, *_btnOXCE, *_btnOTHER;
 	TextButton *_owner;

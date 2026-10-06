@@ -34,6 +34,7 @@ class ComboBox;
  */
 class OptionsGeoscapeState : public OptionsBaseState
 {
+	friend struct OptionsAccess;
 private:
 	Text *_txtDragScroll;
 	ComboBox *_cbxDragScroll;

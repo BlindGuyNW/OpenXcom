@@ -33,6 +33,7 @@ class ToggleTextButton;
  */
 class OptionsAudioState : public OptionsBaseState
 {
+	friend struct OptionsAccess;
 private:
 	static const std::string musFormats[], sndFormats[];
 	Text *_txtMusicVolume, *_txtSoundVolume, *_txtUiVolume;

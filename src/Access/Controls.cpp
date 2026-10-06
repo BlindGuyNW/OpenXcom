@@ -287,16 +287,31 @@ NodeVtable slider(State *state, Slider *slider, const std::string &label)
 	NodeVtable v;
 	v.Type = &sliderType();
 	v.Announcements.push_back(NodeAnnouncement([label] { return label; }, false, AnnouncementKinds::Label));
-	v.Announcements.push_back(NodeAnnouncement([slider] { return std::to_string(slider->getValue()); }, false, AnnouncementKinds::Value));
+	// The raw values mean little (volume runs 0 to 128, speeds are milliseconds per step and run
+	// backwards), so a slider speaks how far along it is, left to right, and Right always moves right.
+	std::function<std::string()> percent = [slider]
+	{
+		int range = slider->getMax() - slider->getMin();
+		int along = slider->isReversed() ? slider->getMax() - slider->getValue() : slider->getValue() - slider->getMin();
+		int pct = range > 0 ? (along * 100 + range / 2) / range : 0;
+		return Vocab::format(Vocab::PERCENT, { std::to_string(pct) });
+	};
+	v.Announcements.push_back(NodeAnnouncement(percent, false, AnnouncementKinds::Value));
 	v.OnAdjust = [state, slider](int sign, bool large)
 	{
-		int value = std::max(slider->getMin(), std::min(slider->getMax(), slider->getValue() + sign * (large ? LARGE_STEP : 1)));
+		// Steps of a twentieth of the range, a quarter with Shift.
+		int range = slider->getMax() - slider->getMin();
+		int step = std::max(1, range / (large ? 4 : 20));
+		if (slider->isReversed())
+			sign = -sign;
+		long long target = (long long)slider->getValue() + (long long)sign * step;
+		int value = (int)std::max<long long>(slider->getMin(), std::min<long long>(slider->getMax(), target));
 		if (value == slider->getValue() || !usable(slider))
 			return;
 		slider->setValue(value);
 		slider->notifyChange(state);
 	};
-	v.StateText = [slider] { return std::to_string(slider->getValue()); };
+	v.StateText = percent;
 	return v;
 }
 

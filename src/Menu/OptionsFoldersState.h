@@ -29,6 +29,7 @@ class Text;
  */
 class OptionsFoldersState : public OptionsBaseState
 {
+	friend struct OptionsAccess;
 private:
 	Text *_txtDataFolder, *_txtUserFolder, *_txtSaveFolder, *_txtConfigFolder;
 	Text* _txtDataFolderPath1, *_txtDataFolderPath2, *_txtUserFolderPath, *_txtSaveFolderPath, *_txtConfigFolderPath;

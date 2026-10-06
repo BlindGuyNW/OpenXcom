@@ -29,6 +29,7 @@ class Text;
  */
 class OptionsNoAudioState : public OptionsBaseState
 {
+	friend struct OptionsAccess;
 private:
 	Text *_txtError;
 public:

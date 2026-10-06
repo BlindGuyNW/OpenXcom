@@ -40,6 +40,7 @@ class Text;
  */
 class OptionsBaseState : public State
 {
+	friend struct OptionsAccess;
 protected:
 	OptionsOrigin _origin;
 	Window *_window;

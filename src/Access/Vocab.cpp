@@ -284,6 +284,16 @@ namespace
 		"shot seen {0}",
 		"heading {0}",
 		"unseen shooter",
+		"{0} percent",
+		"{0} options",
+		"width",
+		"height",
+		"bigger resolution",
+		"smaller resolution",
+		"{0} by {1}",
+		"fixed by the mod",
+		"no key",
+		"press the new key for {0}",
 	};
 }
 

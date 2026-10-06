@@ -38,6 +38,7 @@ class InteractiveSurface;
  */
 class OptionsVideoState : public OptionsBaseState
 {
+	friend struct OptionsAccess;
 private:
 	static const std::string GL_EXT, GL_FOLDER, GL_STRING;
 

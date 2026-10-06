@@ -74,6 +74,8 @@ public:
 	int getMin() const;
 	/// Gets the largest value.
 	int getMax() const;
+	/// Whether the range runs from high on the left to low on the right (the speed sliders).
+	bool isReversed() const;
 	/// Runs the change handler, the way dragging the slider does.
 	void notifyChange(State *state);
 	/// Blits the slider onto another surface.

@@ -35,6 +35,7 @@ class ComboBox;
  */
 class OptionsBattlescapeState : public OptionsBaseState
 {
+	friend struct OptionsAccess;
 private:
 	Text *_txtEdgeScroll, *_txtDragScroll;
 	ComboBox *_cbxEdgeScroll, *_cbxDragScroll;
