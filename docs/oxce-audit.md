@@ -54,7 +54,7 @@ All silent unless noted:
 
 ## Battle
 
-- [ ] **Reserve check arguments** (verified). Fix in 2026-10-06, untested: `eatsIntoReserve` mirrors the preview's call and auto-shot stand-in. `checkReservedTU(before, cost, true)` (Battle.cpp:751) hits OXCE's `(bu, tu, energy, justChecking=false)`, so it can fire real reserve warnings. The preview's yellow test swaps in the autoshot reserve when it's none and passes energy with `justChecking=true` (Pathfinding.cpp:1248-1310). Mirror that.
+- [x] **Reserve check arguments** (verified). Fixed and played 2026-10-06: `eatsIntoReserve` mirrors the preview's call and auto-shot stand-in. `checkReservedTU(before, cost, true)` (Battle.cpp:751) hits OXCE's `(bu, tu, energy, justChecking=false)`, so it can fire real reserve warnings. The preview's yellow test swaps in the autoshot reserve when it's none and passes energy with `justChecking=true` (Pathfinding.cpp:1248-1310). Mirror that.
 - [ ] Path cost ignores stamina, which also turns the path red, and turn-before-first-step (Pathfinding.cpp:1229-1247).
 - [ ] **Psi is narrated as "missed"** (verified). Psi sets `_power = 0` even on success (ExplosionBState.cpp:130-141), so `hit` returns early (TileEngine.cpp:3228-3231). `_reportShot` isn't reset on the non-area branch of `endImpact`.
 - [ ] A bullet into a body on the floor says "missed, hit floor" (TileEngine.cpp:3239-3250). Shotgun pellets 2+ fall outside the bracket (ProjectileFlyBState.cpp:824).

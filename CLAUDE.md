@@ -144,5 +144,5 @@ Next up, in order (agreed after the first full playtest):
 ## Git
 
 - Work on `oxce-accessibility` (this worktree); `accessibility` in `C:\git\OpenXcom` is the vanilla fallback. `master` tracks vanilla upstream. Remotes: `origin` is the user's fork (BlindGuyNW/OpenXcom), `upstream` is OpenXcom/OpenXcom, `oxce` is MeridianOXC/OpenXcom.
-- `oxce-accessibility` tracks `oxce/oxce-plus` and hasn't been pushed to `origin` (as of 2026-10-06). Never push to `oxce` or `upstream`; push to `origin` only when the user asks.
+- `oxce-accessibility` tracks `origin/oxce-accessibility` (pushed 2026-10-06). Take OXCE updates with `git fetch oxce` and `git merge oxce/oxce-plus`. Never push to `oxce` or `upstream`; push to `origin` only when the user asks.
 - Never commit until the user has tested the change in game: build, say what to try, then wait. A test report isn't a go-ahead: ask "Commit?" and commit only on a yes.
