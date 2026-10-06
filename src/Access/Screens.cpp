@@ -72,6 +72,9 @@
 #include "../Geoscape/MultipleTargetsState.h"
 #include "../Geoscape/NewPossibleManufactureState.h"
 #include "../Geoscape/NewPossibleResearchState.h"
+#include "../Geoscape/NewPossiblePurchaseState.h"
+#include "../Geoscape/NewPossibleCraftState.h"
+#include "../Geoscape/NewPossibleFacilityState.h"
 #include "../Geoscape/ProductionCompleteState.h"
 #include "../Geoscape/ResearchCompleteState.h"
 #include "../Geoscape/ResearchRequiredState.h"
@@ -181,6 +184,9 @@
 #include "Navigator.h"
 #include "Speech.h"
 #include "../Battlescape/NextTurnState.h"
+#include "../Battlescape/InfoboxState.h"
+#include "../Battlescape/InfoboxOKState.h"
+#include "../Battlescape/ConfirmEndMissionState.h"
 #include "../Engine/InteractiveSurface.h"
 #include "../Engine/LocalizedText.h"
 #include "Vocab.h"
@@ -3164,6 +3170,17 @@ AccessScreen optionsControls()
 	return s;
 }
 
+/// The battle's timed message box ("X has panicked", "Mind control successful"): says the message,
+/// queued so it follows the narration. Any key closes it, so every key goes to the game. It closes
+/// itself after two seconds; the speech carries on. A sound-only box has no visible text and says nothing.
+AccessScreen infobox()
+{
+	AccessScreen s = simpleScreen("infobox", is<InfoboxState>);
+	s.build = [](GraphBuilder &, State *) {};
+	s.passKeys = [](State *) { return true; };
+	return s;
+}
+
 const std::vector<AccessScreen> &all()
 {
 	static const std::vector<AccessScreen> screens = {
@@ -3184,6 +3201,9 @@ const std::vector<AccessScreen> &all()
 		simpleScreen("pause", is<PauseState>),
 		simpleScreen("abandonGame", is<AbandonGameState>),
 		simpleScreen("abortMission", is<AbortMissionState>),
+		simpleScreen("confirmEndMission", is<ConfirmEndMissionState>),
+		infobox(),
+		simpleScreen("infoboxOK", is<InfoboxOKState>),
 		listGames("listLoad", is<ListLoadState>),
 		listGames("listSave", is<ListSaveState>),
 		simpleScreen("deleteGame", is<DeleteGameState>),
@@ -3209,6 +3229,9 @@ const std::vector<AccessScreen> &all()
 		popupScreen("researchRequired", is<ResearchRequiredState>),
 		newPossibleResearch(),
 		popupScreen("newPossibleManufacture", is<NewPossibleManufactureState>),
+		popupScreen("newPossiblePurchase", is<NewPossiblePurchaseState>),
+		popupScreen("newPossibleCraft", is<NewPossibleCraftState>),
+		popupScreen("newPossibleFacility", is<NewPossibleFacilityState>),
 		popupScreen("productionComplete", is<ProductionCompleteState>),
 		popupScreen("itemsArriving", is<ItemsArrivingState>),
 		popupScreen("multipleTargets", is<MultipleTargetsState>),
