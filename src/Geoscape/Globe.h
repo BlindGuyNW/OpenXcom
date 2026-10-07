@@ -153,6 +153,9 @@ public:
 	size_t getZoom() const;
 	/// Centers the globe on a point.
 	void center(double lon, double lat);
+	/// Gets the point the globe is centred on (for the accessibility layer).
+	double getCenterLongitude() const { return _cenLon; }
+	double getCenterLatitude() const { return _cenLat; }
 	/// Checks if a point is inside land.
 	bool insideLand(double lon, double lat) const;
 	/// Checks if a point is inside fakeUnderwater texture.

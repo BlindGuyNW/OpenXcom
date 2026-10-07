@@ -302,6 +302,15 @@ namespace
 		"{0} of {1} mods on",
 		"load order {0} of {1}",
 		"no mods for this base game",
+		"at {0}",
+		"{0} of {1}",
+		"no radar cover",
+		"radar cover from {0}",
+		"globe cursor",
+		"Arrows move 250 nautical miles, Shift 1,000, Ctrl 50. Backspace on a city or target starts the cursor there. Ctrl+L adds radar cover. Enter {0}.",
+		"no land here",
+		"sends the craft there",
+		"places the base there, or on the nearest land",
 	};
 }
 

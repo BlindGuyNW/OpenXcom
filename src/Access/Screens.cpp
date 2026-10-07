@@ -2125,9 +2125,107 @@ bool landNear(Globe *globe, double &lon, double &lat)
 	return false;
 }
 
+/// The globe cursor: a point moved by compass, for sending a craft or placing a base away from
+/// the named cities. One at a time; a screen it hasn't seen starts it afresh.
+struct GlobeCursor
+{
+	State *owner = 0;
+	double lon = 0, lat = 0;
+	/// The crafts being sent: their radar goes with them, so it doesn't cover the spot.
+	std::vector<Craft *> sent;
+};
+GlobeCursor _cursor;
+const ControlId CURSOR_ID = ControlId::Structural("globeCursor");
+
+/// Where the cursor is: place, sea, nearest city; for a craft, where it lies from the craft and
+/// whether it's in range; with radar, whose radar circle covers it.
+std::string cursorText(Craft *craft, bool radar)
+{
+	double lon = _cursor.lon, lat = _cursor.lat;
+	std::vector<std::string> parts = { Geo::placeName(lon, lat), Geo::seaText(lon, lat), Geo::nearestCityText(lon, lat) };
+	if (craft)
+	{
+		std::string offset = Geo::offsetText(craft, lon, lat);
+		if (!offset.empty())
+			parts.push_back(Vocab::format(Vocab::OFFSET_OF, { offset, craft->getName(State::getGamePtr()->getLanguage()) }));
+		parts.push_back(Vocab::get(craft->getDistance(lon, lat) <= craft->getBaseRange() ? Vocab::DF_IN_RANGE : Vocab::DF_OUT_OF_RANGE));
+	}
+	if (radar)
+		parts.push_back(Geo::radarText(lon, lat, _cursor.sent));
+	std::string s;
+	for (const std::string &p : parts)
+	{
+		if (!p.empty())
+			s += (s.empty() ? "" : ", ") + p;
+	}
+	return s;
+}
+
+/// The cursor's Tab-stop: one node reading where the cursor is. `start` places it when the screen
+/// is new; Enter runs `activate` on the point. The arrows are the recipe's `keys` (globeCursorKeys).
+void addGlobeCursor(GraphBuilder &b, State *state, Craft *craft, const std::vector<Craft *> &sent, Vocab::Id enterText,
+	const std::function<void(double &, double &)> &start, const std::function<void(double, double)> &activate)
+{
+	if (_cursor.owner != state)
+	{
+		_cursor.owner = state;
+		start(_cursor.lon, _cursor.lat);
+	}
+	_cursor.sent = sent;
+	b.BeginStop("cursor");
+	b.PushContext(Vocab::get(Vocab::GLOBE_CURSOR));
+	NodeVtable v;
+	v.Announcements.push_back(NodeAnnouncement([craft] { return cursorText(craft, false); }, false, AnnouncementKinds::Label));
+	v.OnActivate = [activate] { activate(_cursor.lon, _cursor.lat); };
+	std::string hint = Vocab::format(Vocab::GLOBE_CURSOR_HINT, { Vocab::get(enterText) });
+	v.OnTooltip = [hint] { Speech::say(hint, true); };
+	b.AddItem(CURSOR_ID, v);
+	b.PopContext();
+}
+
+/// Backspace on a city or target: the cursor starts from there.
+void cursorFrom(NodeVtable &v, State *state, const Target *t)
+{
+	v.OnSecondary = [state, t]
+	{
+		_cursor.lon = t->getLongitude();
+		_cursor.lat = t->getLatitude();
+		Navigator::focus(state, CURSOR_ID);
+	};
+}
+
+/// The cursor's keys, while it has focus: arrows move it by compass (250 nautical miles,
+/// Shift 1,000, Ctrl 50) and say where it is; Ctrl+L adds radar cover.
+/// The globe follows it, so a sighted onlooker sees the spot.
+bool globeCursorKeys(const ControlId &focus, SDLKey key, bool shift, bool ctrl, Craft *craft)
+{
+	if (focus != CURSOR_ID)
+		return false;
+	if (ctrl && key == SDLK_l)
+	{
+		Speech::say(cursorText(craft, true), true);
+		return true;
+	}
+	int dir;
+	switch (key)
+	{
+	case SDLK_UP: dir = 0; break;
+	case SDLK_RIGHT: dir = 2; break;
+	case SDLK_DOWN: dir = 4; break;
+	case SDLK_LEFT: dir = 6; break;
+	default: return false;
+	}
+	Geo::movePoint(_cursor.lon, _cursor.lat, dir, ctrl ? 50 : shift ? 1000 : 250);
+	if (Globe *globe = Geo::globe())
+		globe->center(_cursor.lon, _cursor.lat);
+	Speech::say(cursorText(craft, false), true);
+	return true;
+}
+
 /// Picking where a new base goes: the game's cities grouped by region (with the base cost,
 /// after the first base), each with its country. Enter centres the globe on the city and
 /// clicks the globe, so the game's own handler places the base and runs its checks.
+/// Then the globe cursor, for anywhere else (Backspace on a city starts it there).
 AccessScreen buildNewBase()
 {
 	AccessScreen s;
@@ -2164,13 +2262,45 @@ AccessScreen buildNewBase()
 					build->getGlobe()->center(lon, lat);
 					Controls::click(build, build->getGlobe());
 				};
+				cursorFrom(v, state, city);
 				b.AddItem(ControlId::Referenced(city, "city:" + rules->getType() + ":" + std::to_string(i)), v);
 			}
 			b.PopContext();
 		}
+		// Anywhere else: starts at the first base, or wherever the globe is turned for the first.
+		Globe *globe = build->getGlobe();
+		addGlobeCursor(b, state, 0, {}, Vocab::CURSOR_BUILD, [globe](double &lon, double &lat)
+		{
+			lon = globe->getCenterLongitude();
+			lat = globe->getCenterLatitude();
+			for (Base *base : *State::getGamePtr()->getSavedGame()->getBases())
+			{
+				// The base being placed sits at 0, 0.
+				if (!AreSame(base->getLongitude(), 0.0) || !AreSame(base->getLatitude(), 0.0))
+				{
+					lon = base->getLongitude();
+					lat = base->getLatitude();
+					return;
+				}
+			}
+		}, [build, globe](double lon, double lat)
+		{
+			// The game ignores a click on the sea, so say so rather than nothing.
+			if (!landNear(globe, lon, lat))
+			{
+				Speech::say(Vocab::get(Vocab::NO_LAND_HERE), true);
+				return;
+			}
+			globe->center(lon, lat);
+			Controls::click(build, globe);
+		});
 		// Cancel, when it's there (not for the first base).
 		b.BeginStop("buttons");
 		addWidgets(b, state);
+	};
+	s.keys = [](State *, const ControlId &focus, SDLKey key, bool shift, bool ctrl)
+	{
+		return globeCursorKeys(focus, key, shift, ctrl, 0);
 	};
 	return s;
 }
@@ -2274,9 +2404,20 @@ std::string destinationText(Craft *craft, const std::string &name, double lon, d
 	return s;
 }
 
+/// Sends the crafts to a point as clicking an empty spot on the globe does: a fresh waypoint,
+/// registered only if confirmed.
+void sendToPoint(const std::vector<Craft *> &crafts, double lon, double lat)
+{
+	Waypoint *w = new Waypoint();
+	w->setLongitude(lon);
+	w->setLatitude(lat);
+	State::getGamePtr()->pushState(new MultipleTargetsState(std::vector<Target *>(1, w), crafts, 0, false));
+}
+
 /// Select destination: what's on the globe a craft can go to, nearest first, then the cities
 /// by region for flying to a point. Enter goes through MultipleTargetsState as a globe click does,
-/// so the game's own confirmation (and waypoint bookkeeping) follows.
+/// so the game's own confirmation (and waypoint bookkeeping) follows. Then the globe cursor,
+/// for a waypoint anywhere (Backspace on a target or city starts it there).
 AccessScreen selectDestination()
 {
 	AccessScreen s;
@@ -2302,6 +2443,7 @@ AccessScreen selectDestination()
 					return destinationText(craft, t->getName(game->getLanguage()), t->getLongitude(), t->getLatitude());
 				}, false, AnnouncementKinds::Label));
 				v.OnActivate = [crafts, t, game] { game->pushState(new MultipleTargetsState(std::vector<Target *>(1, t), crafts, 0, false)); };
+				cursorFrom(v, state, t);
 				b.AddItem(ControlId::Referenced(t, "target:" + t->getType() + ":" + std::to_string(t->getId())), v);
 			}
 			b.PopContext();
@@ -2321,21 +2463,25 @@ AccessScreen selectDestination()
 				{
 					return destinationText(craft, city->getName(game->getLanguage()), city->getLongitude(), city->getLatitude());
 				}, false, AnnouncementKinds::Label));
-				v.OnActivate = [crafts, city, game]
-				{
-					// What clicking an empty spot on the globe does: a fresh waypoint, registered only if confirmed.
-					Waypoint *w = new Waypoint();
-					w->setLongitude(city->getLongitude());
-					w->setLatitude(city->getLatitude());
-					game->pushState(new MultipleTargetsState(std::vector<Target *>(1, w), crafts, 0, false));
-				};
+				v.OnActivate = [crafts, city] { sendToPoint(crafts, city->getLongitude(), city->getLatitude()); };
+				cursorFrom(v, state, city);
 				b.AddItem(ControlId::Referenced(city, "city:" + rules->getType() + ":" + std::to_string(i)), v);
 			}
 			b.PopContext();
 		}
+		// Anywhere else: starts at the craft.
+		addGlobeCursor(b, state, craft, crafts, Vocab::CURSOR_SEND, [craft](double &lon, double &lat)
+		{
+			lon = craft->getLongitude();
+			lat = craft->getLatitude();
+		}, [crafts](double lon, double lat) { sendToPoint(crafts, lon, lat); });
 		// Cancel, and Cydonia when it's offered.
 		b.BeginStop("buttons");
 		addWidgets(b, state);
+	};
+	s.keys = [](State *state, const ControlId &focus, SDLKey key, bool shift, bool ctrl)
+	{
+		return globeCursorKeys(focus, key, shift, ctrl, static_cast<SelectDestinationState *>(state)->getCraft());
 	};
 	return s;
 }

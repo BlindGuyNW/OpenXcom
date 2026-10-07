@@ -31,10 +31,14 @@
 #include "../Geoscape/Globe.h"
 #include "../Geoscape/MultipleTargetsState.h"
 #include "../Interface/TextButton.h"
+#include "../Mod/City.h"
+#include "../Mod/RuleBaseFacility.h"
 #include "../Mod/RuleCountry.h"
+#include "../Mod/RuleCraft.h"
 #include "../Mod/RuleRegion.h"
 #include "../Savegame/AlienBase.h"
 #include "../Savegame/Base.h"
+#include "../Savegame/BaseFacility.h"
 #include "../Savegame/Country.h"
 #include "../Savegame/Craft.h"
 #include "../Savegame/GameTime.h"
@@ -54,6 +58,8 @@ namespace
 {
 	/// Nautical miles per radian of great circle (60 per degree).
 	const double NM_PER_RADIAN = 60.0 * 180.0 / M_PI;
+	/// Globe::MAX_DRAW_RADAR_CIRCLE_RADIUS (private): wider radars draw no circle.
+	const int MAX_DRAW_RADAR = 10000;
 
 	enum ScanCategory { SCAN_UFOS, SCAN_SITES, SCAN_ALIEN_BASES, SCAN_CRAFT, SCAN_BASES, SCAN_WAYPOINTS, SCAN_COUNT };
 
@@ -279,15 +285,95 @@ std::string placeName(double lon, double lat)
 	return "";
 }
 
-std::string seaText(double lon, double lat)
+Globe *globe()
 {
-	// The Geoscape sits under every campaign screen, so its globe is always on the stack.
 	for (State *s : game()->getStates())
 	{
 		if (GeoscapeState *geo = dynamic_cast<GeoscapeState *>(s))
-			return geo->getGlobe()->insideLand(lon, lat) ? std::string() : Vocab::get(Vocab::OVER_SEA);
+			return geo->getGlobe();
 	}
-	return "";
+	return 0;
+}
+
+std::string seaText(double lon, double lat)
+{
+	Globe *g = globe();
+	if (!g)
+		return "";
+	return g->insideLand(lon, lat) ? std::string() : Vocab::get(Vocab::OVER_SEA);
+}
+
+void movePoint(double &lon, double &lat, int dir, int miles)
+{
+	// Steps along the parallel and the meridian rather than a great circle: a cursor that goes
+	// back where it came from, and never turns as it travels. The game's latitude is negative to the north.
+	const double maxLat = 85.0 * M_PI / 180.0;
+	double d = miles / NM_PER_RADIAN;
+	if (dir == 0 || dir == 4)
+	{
+		lat = Clamp(lat + (dir == 0 ? -d : d), -maxLat, maxLat);
+	}
+	else
+	{
+		lon += (dir == 2 ? d : -d) / cos(lat);
+		while (lon < 0)
+			lon += 2 * M_PI;
+		while (lon >= 2 * M_PI)
+			lon -= 2 * M_PI;
+	}
+}
+
+std::string nearestCityText(double lon, double lat)
+{
+	const City *nearest = 0;
+	double best = 0;
+	for (Region *r : *save()->getRegions())
+	{
+		for (const City *c : *r->getRules()->getCities())
+		{
+			double d = c->getDistance(lon, lat);
+			if (!nearest || d < best)
+			{
+				nearest = c;
+				best = d;
+			}
+		}
+	}
+	if (!nearest)
+		return "";
+	std::string name = nearest->getName(game()->getLanguage());
+	std::string offset = offsetText(nearest, lon, lat);
+	return offset.empty() ? Vocab::format(Vocab::AT_PLACE, { name }) : Vocab::format(Vocab::OFFSET_OF, { offset, name });
+}
+
+std::string radarText(double lon, double lat, const std::vector<Craft *> &skip)
+{
+	// Globe::drawRadars: a base's circle is its widest finished radar; craft draw theirs while out.
+	std::string names;
+	auto add = [&names](const std::string &name) { names += (names.empty() ? "" : ", ") + name; };
+	for (Base *base : *save()->getBases())
+	{
+		// A base still being placed sits at 0, 0 and draws no circle.
+		if (AreSame(base->getLongitude(), 0.0) && AreSame(base->getLatitude(), 0.0))
+			continue;
+		int range = 0;
+		for (BaseFacility *fac : *base->getFacilities())
+		{
+			int r = fac->getRules()->getRadarRange();
+			if (fac->getBuildTime() == 0 && r < MAX_DRAW_RADAR && r > range)
+				range = r;
+		}
+		if (range > 0 && base->getDistance(lon, lat) <= Nautical(range))
+			add(base->getName());
+		for (Craft *craft : *base->getCrafts())
+		{
+			int r = craft->getCraftStats().radarRange;
+			if (craft->getStatus() == "STR_OUT" && r > 0 && craft->getDistance(lon, lat) <= Nautical(r) &&
+				std::find(skip.begin(), skip.end(), craft) == skip.end())
+				add(craft->getName(game()->getLanguage()));
+		}
+	}
+	return names.empty() ? Vocab::get(Vocab::NO_RADAR) : Vocab::format(Vocab::RADAR_FROM, { names });
 }
 
 std::string offsetText(const Target *from, double lon, double lat)

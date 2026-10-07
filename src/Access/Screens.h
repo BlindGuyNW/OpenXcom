@@ -20,6 +20,7 @@
 #include <functional>
 #include <string>
 #include <vector>
+#include <SDL.h>
 #include "Graph/GraphBuilder.hpp"
 
 namespace OpenXcom
@@ -49,6 +50,9 @@ struct AccessScreen
 	/// While this returns true the navigator stands down and every key goes to the game,
 	/// as for a focused text field: the key binding list waiting for its new key. Optional.
 	std::function<bool(State *)> passKeys;
+	/// Offered each key-down before the navigator's own keys, with the focused node: returns true
+	/// to claim it. For controls the graph keys can't express, like the globe cursor's four-way moves. Optional.
+	std::function<bool(State *, const Graph::ControlId &, SDLKey, bool shift, bool ctrl)> keys;
 };
 
 namespace Screens

@@ -329,6 +329,15 @@ namespace
 	/// Acts on a key-down for the attached screen. Returns whether the layer owns the key.
 	bool dispatch(SDLKey key, bool shift, bool ctrl)
 	{
+		if (_screen->keys)
+		{
+			GraphNode *node = _graph->Rerender() ? _graph->CurrentNode() : 0;
+			bool claimed = false;
+			if (node)
+				guarded("keys", [&] { claimed = _screen->keys(_state, node->Id, key, shift, ctrl); });
+			if (claimed)
+				return true;
+		}
 		if (ctrl)
 		{
 			if (key == SDLK_l)

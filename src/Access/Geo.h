@@ -25,6 +25,8 @@ namespace OpenXcom
 {
 
 class GeoscapeState;
+class Craft;
+class Globe;
 class Target;
 
 /**
@@ -59,6 +61,16 @@ namespace Geo
 	std::string seaText(double lon, double lat);
 	/// Distance and compass bearing from one target to a point: "1,230 nautical miles northeast".
 	std::string offsetText(const Target *from, double lon, double lat);
+	/// The Geoscape's globe, which sits under every campaign screen. Null outside a campaign.
+	Globe *globe();
+	/// Moves a point a distance along a compass direction (0 north, 2 east, 4 south, 6 west),
+	/// keeping it off the poles, where east and west stop meaning anything.
+	void movePoint(double &lon, double &lat, int dir, int miles);
+	/// The nearest city and where the point lies from it: "300 nautical miles west of Lisbon", or "at Lisbon".
+	std::string nearestCityText(double lon, double lat);
+	/// Whose radar circle covers a point, as the globe draws them (each base's widest finished radar,
+	/// each craft in flight but those in `skip`): "radar cover from Base 1, Interceptor-1", or "no radar cover".
+	std::string radarText(double lon, double lat, const std::vector<Craft *> &skip = {});
 }
 
 }
