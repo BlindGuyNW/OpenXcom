@@ -133,4 +133,13 @@ void ScannerState::exitClick(Action *)
 	_game->popState();
 }
 
+/**
+ * Gets the unit using the scanner, at the centre of the view.
+ * @return Pointer to the unit.
+ */
+BattleUnit *ScannerState::getActor() const
+{
+	return _action->actor;
+}
+
 }

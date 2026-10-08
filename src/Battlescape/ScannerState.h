@@ -25,6 +25,7 @@ namespace OpenXcom
 class Surface;
 class Timer;
 class ScannerView;
+class BattleUnit;
 struct BattleAction;
 
 /**
@@ -51,5 +52,7 @@ public:
 	void think() override;
 	/// Handler for exiting the state.
 	void exitClick(Action *action);
+	/// Gets the unit using the scanner (the centre of the view).
+	BattleUnit *getActor() const;
 };
 }

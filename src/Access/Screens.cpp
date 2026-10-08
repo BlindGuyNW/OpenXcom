@@ -107,6 +107,7 @@
 #include "../Engine/Unicode.h"
 #include "../fmath.h"
 #include "Geo.h"
+#include "Battle.h"
 #include "Dogfight.h"
 #include "../Battlescape/AliensCrashState.h"
 #include "../Geoscape/BaseDefenseState.h"
@@ -3624,7 +3625,7 @@ const std::vector<AccessScreen> &all()
 		simpleScreen("craftArmor", is<CraftArmorState>),
 		simpleScreen("soldierArmor", is<SoldierArmorState>),
 		soldierInfo(),
-		actionMenu(), primeGrenade(), medikit(), debriefing(),
+		actionMenu(), primeGrenade(), medikit(), Battle::scannerScreen(), debriefing(),
 		tablePopup("promotions", is<PromotionsState>, { "STR_NEW_RANK", "STR_BASE" }),
 		popupScreen("commendations", is<CommendationState>),
 		popupScreen("commendationsLate", is<CommendationLateState>),

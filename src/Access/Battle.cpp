@@ -36,6 +36,7 @@
 #include "../Battlescape/Pathfinding.h"
 #include "../Battlescape/Position.h"
 #include "../Battlescape/Projectile.h"
+#include "../Battlescape/ScannerState.h"
 #include "../Battlescape/TileEngine.h"
 #include "../Engine/Game.h"
 #include "../Engine/Language.h"
@@ -224,6 +225,20 @@ namespace
 	std::string unitName(BattlescapeState *state, BattleUnit *unit)
 	{
 		return joinComma({ unitLabel(unit), facingText(unit) });
+	}
+
+	/// A motion scanner blip's size as ScannerView draws it: a fifth of the unit's motion points
+	/// (3 or 4 a tile walked, 30 for a big unit, reset at the start of its side's turn), capped at 5.
+	std::string blipText(BattleUnit *unit)
+	{
+		int size = std::min(unit->getMotionPoints() / 5, 5);
+		return Vocab::format(Vocab::BLIP, { Vocab::get((Vocab::Id)(Vocab::BLIP_FAINT + size)) });
+	}
+
+	/// The offset to a scanner blip: the scanner flattens every level, so no up or down.
+	std::string flatOffset(Position from, Position to)
+	{
+		return offsetText(from, Position(to.x, to.y, from.z));
 	}
 
 	/// An item's name as the inventory shows it: unresearched alien items are just "Alien Artifact".
@@ -839,7 +854,7 @@ namespace
 
 	// The scanner: points of interest bucketed by category, rebuilt from live state on each key.
 
-	enum ScanCategory { SCAN_SOLDIERS, SCAN_ENEMIES, SCAN_CIVILIANS, SCAN_ITEMS, SCAN_DOORS, SCAN_EXITS, SCAN_COUNT };
+	enum ScanCategory { SCAN_SOLDIERS, SCAN_ENEMIES, SCAN_CIVILIANS, SCAN_ITEMS, SCAN_DOORS, SCAN_EXITS, SCAN_CONTACTS, SCAN_COUNT };
 
 	/// One scanner entry. Units are identified by pointer since they move; everything else by tile and tag.
 	struct ScanEntry
@@ -856,7 +871,7 @@ namespace
 
 	Vocab::Id categoryName(int category)
 	{
-		static const Vocab::Id names[SCAN_COUNT] = { Vocab::SCAN_SOLDIERS, Vocab::SCAN_ENEMIES, Vocab::SCAN_CIVILIANS, Vocab::SCAN_ITEMS, Vocab::SCAN_DOORS, Vocab::SCAN_EXITS };
+		static const Vocab::Id names[SCAN_COUNT] = { Vocab::SCAN_SOLDIERS, Vocab::SCAN_ENEMIES, Vocab::SCAN_CIVILIANS, Vocab::SCAN_ITEMS, Vocab::SCAN_DOORS, Vocab::SCAN_EXITS, Vocab::SCAN_CONTACTS };
 		return names[category];
 	}
 
@@ -886,6 +901,23 @@ namespace
 			{
 				if (unit->getFaction() == factions[category] && unitShown(unit))
 					out.push_back({ unitName(state, unit), unit->getPosition(), unit, 0 });
+			}
+		}
+		else if (category == SCAN_CONTACTS)
+		{
+			// What OXCE marks on the map while Alt is held (Map.cpp): units the motion scanner
+			// picked up this turn, at their current spot but not their level ("no spoilers").
+			if (save->getSide() == FACTION_PLAYER)
+			{
+				for (BattleUnit *unit : *save->getUnits())
+				{
+					if (unit->getScannedTurn() != save->getTurn() || unit->getFaction() == FACTION_PLAYER || unit->isOut())
+						continue;
+					if (unitShown(unit))
+						out.push_back({ unitName(state, unit), unit->getPosition(), unit, 0 });
+					else
+						out.push_back({ blipText(unit), Position(unit->getPosition().x, unit->getPosition().y, anchor().z), unit, 0 });
+				}
 			}
 		}
 		else
@@ -1029,7 +1061,8 @@ namespace
 		{
 			if (e.same(_scanCurrent))
 			{
-				Position p = e.unit ? unitTile(state, e.unit) : e.pos;
+				// A hidden contact's entry sits on our level, so the cursor doesn't give its level away.
+				Position p = (e.unit && unitShown(e.unit)) ? unitTile(state, e.unit) : e.pos;
 				moveCursor(state, p, p.z != _cursor.z);
 				return;
 			}
@@ -1520,6 +1553,67 @@ void shotOffMap(SavedBattleGame *save)
 {
 	if (save == _battle && _reportShot)
 		say(Vocab::get(Vocab::MISSED), false);
+}
+
+namespace
+{
+	/// The units ScannerView draws a blip for: anyone with motion points within 9 tiles of the
+	/// soldier on any level, each once (a big unit's four tiles make one blip group), nearest first.
+	std::vector<BattleUnit *> scannerContacts(ScannerState *scanner)
+	{
+		SavedBattleGame *save = State::getGamePtr()->getSavedGame()->getSavedBattle();
+		Position centre = scanner->getActor()->getPosition();
+		std::vector<BattleUnit *> out;
+		for (int x = -9; x < 10; x++)
+		{
+			for (int y = -9; y < 10; y++)
+			{
+				for (int z = 0; z < save->getMapSizeZ(); z++)
+				{
+					Tile *t = save->getTile(Position(centre.x + x, centre.y + y, z));
+					BattleUnit *unit = t ? t->getUnit() : 0;
+					if (unit && unit->getMotionPoints() > 0 && std::find(out.begin(), out.end(), unit) == out.end())
+						out.push_back(unit);
+				}
+			}
+		}
+		std::stable_sort(out.begin(), out.end(), [&](BattleUnit *a, BattleUnit *b)
+		{
+			Position da = a->getPosition() - centre, db = b->getPosition() - centre;
+			return da.x * da.x + da.y * da.y < db.x * db.x + db.y * db.y;
+		});
+		return out;
+	}
+}
+
+AccessScreen scannerScreen()
+{
+	AccessScreen s;
+	s.key = "scanner";
+	s.isActive = [](State *state) { return dynamic_cast<ScannerState *>(state) != 0; };
+	s.name = [](State *state)
+	{
+		size_t n = scannerContacts(static_cast<ScannerState *>(state)).size();
+		std::string count = n == 0 ? Vocab::get(Vocab::SCANNER_NONE)
+			: n == 1 ? Vocab::get(Vocab::SCANNER_ONE) : Vocab::format(Vocab::SCANNER_COUNT, { num((int)n) });
+		return joinComma({ Vocab::get(Vocab::SCANNER), count });
+	};
+	// One item per blip: "large blip, 5 north, 2 east". A unit a sighted player can see is named
+	// first; the rest are only blips, with no level, since the scanner flattens every level.
+	s.build = [](Graph::GraphBuilder &b, State *state)
+	{
+		ScannerState *scanner = static_cast<ScannerState *>(state);
+		Position centre = scanner->getActor()->getPosition();
+		b.BeginStop("contacts");
+		for (BattleUnit *unit : scannerContacts(scanner))
+		{
+			std::string text = joinComma({ unitShown(unit) ? unitLabel(unit) : std::string(), blipText(unit), flatOffset(centre, unit->getPosition()) });
+			Graph::NodeVtable v;
+			v.Announcements.push_back(Graph::NodeAnnouncement([text] { return text; }, false, Graph::AnnouncementKinds::Label));
+			b.AddItem(Graph::ControlId::Referenced(unit, "contact"), v);
+		}
+	};
+	return s;
 }
 
 }

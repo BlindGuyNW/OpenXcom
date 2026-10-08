@@ -109,6 +109,7 @@ namespace
 		"Items",
 		"Doors",
 		"Exits",
+		"Motion contacts",
 		"{0}, {1}",
 		"{0}, none",
 		"That's gone",
@@ -311,6 +312,17 @@ namespace
 		"no land here",
 		"sends the craft there",
 		"places the base there, or on the nearest land",
+		"Motion scanner",
+		"no movement",
+		"1 contact",
+		"{0} contacts",
+		"{0} blip",
+		"faint",
+		"small",
+		"medium",
+		"large",
+		"very large",
+		"huge",
 	};
 }
 

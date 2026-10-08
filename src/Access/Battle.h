@@ -18,6 +18,7 @@
  * along with OpenXcom.  If not, see <http://www.gnu.org/licenses/>.
  */
 #include <SDL.h>
+#include "Screens.h"
 
 namespace OpenXcom
 {
@@ -42,7 +43,8 @@ class SavedBattleGame;
  *
  * The scanner: Period/Comma step through the current category nearest first,
  * Shift+Period/Comma change category (soldiers, enemies, civilians, items,
- * doors, exits: craft and stage exit tiles), Slash jumps the cursor to the current entry.
+ * doors, exits: craft and stage exit tiles, motion contacts: what the motion scanner picked up
+ * this turn), Slash jumps the cursor to the current entry.
  */
 namespace Battle
 {
@@ -58,6 +60,9 @@ namespace Battle
 	void endImpact(SavedBattleGame *save, BattleUnit *attacker, bool areaEffect);
 	/// A shot that left the map without hitting anything.
 	void shotOffMap(SavedBattleGame *save);
+
+	/// The motion scanner (ScannerState): every blip, nearest first, as size and offset from the soldier.
+	AccessScreen scannerScreen();
 }
 
 }
