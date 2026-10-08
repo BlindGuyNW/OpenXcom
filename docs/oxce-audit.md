@@ -87,7 +87,7 @@ All silent unless noted:
 - [ ] X and Z on Sell, Transfer and crew lists sell, transfer or remove everything (Options.cpp:531-555).
 - [ ] End opens the music picker (Geoscape and battle). Ctrl+Home and Ctrl+End in battle change the palette and vision mode.
 - [ ] Battle Space also holds night vision (Map.cpp:2449 reads raw key state).
-- [ ] Unreachable ctrl-click actions: Ignore UFO (UfoDetectedState.cpp:254-260), Patrol on landing (ConfirmLandingState.cpp:315-322), force fire, spray autoshot. Ctrl+Enter is the natural key.
+- [ ] Unreachable ctrl-click actions: Ignore UFO (UfoDetectedState.cpp:254-260), Patrol on landing (ConfirmLandingState.cpp:315-322), spray autoshot. Ctrl+Enter is the natural key. Force fire is in (Ctrl+Enter while aiming a gun, 2026-10-07; played).
 - [ ] Escape in a focused TextEdit clears the field, then submits (TextEdit.cpp:544-557).
 
 ## Free keys (from the hotkey pass)
@@ -109,7 +109,7 @@ Next, in a plain campaign:
 - [x] UnitInfo (S in battle; played 2026-10-06): name on arrival, one item per stat ("16 of 65" from the bar's maximum, "stun N" from its second value; stun not yet seen), previous/next soldier say the new name. Mind probe not yet seen.
 - [ ] ItemLocations (Enter on Stores, Purchase, Sell, Transfer).
 
-Later in a campaign: AllocatePsiTraining and TrainingFinished (Psi Lab), SoldierDiary overview, performance and mission (soldier info's Diary button), Scanner (motion scanner item, blips only: needs a parity design), the tech tree viewers, the Global research, manufacture and containment screens, UfoTracker, Notes, StatsForNerds, TurnDiary and the hit log (Ctrl+H, an Infobox, now read), ExperienceOverview, AlienInventory, SelectMusicTrack, the inventory and craft-equipment template dialogs, BriefingLight.
+Later in a campaign: AllocatePsiTraining and TrainingFinished (Psi Lab), SoldierDiary overview, performance and mission (soldier info's Diary button), the tech tree viewers, the Global research, manufacture and containment screens, UfoTracker, Notes, StatsForNerds, TurnDiary and the hit log (Ctrl+H, an Infobox, now read), ExperienceOverview, AlienInventory, SelectMusicTrack, the inventory and craft-equipment template dialogs, BriefingLight.
 
 Not reachable with this setup: GeoscapeEvent, pilots, transformations, SkillMenu, SoldierBonus (mods); the Extended links menus (`oxceLinks`); SelectStartFacility and PlaceStartFacility (`customInitialBase`); MiniMap (the cursor replaces it); TFTD, unit and soldier articles (not in `xcom1`, probably).
 
