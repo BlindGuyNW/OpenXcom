@@ -111,6 +111,14 @@ namespace
 		bool shown;
 	};
 	std::map<BattleUnit *, UnitBefore> _before;
+	/// The seen terrain worth naming just before a hit or explosion, to say what it destroyed.
+	struct TerrainBefore
+	{
+		Tile *tile;
+		TilePart part;
+		MapData *data;
+	};
+	std::vector<TerrainBefore> _terrainBefore;
 	/// We started an action; speak the result once the game is idle again.
 	bool _awaiting = false;
 	/// We set the game's touch-screen Ctrl for a force fire; cleared once the shot is over.
@@ -1589,10 +1597,30 @@ void update(BattlescapeState *state)
 void beginImpact(SavedBattleGame *save)
 {
 	_before.clear();
+	_terrainBefore.clear();
 	if (save != _battle)
 		return;
 	for (BattleUnit *unit : *save->getUnits())
 		_before[unit] = { unit->getHealth(), unit->getStunlevel(), unitShown(unit) };
+	// Terrain a sighted player would notice going: walls, solid objects and upper floors,
+	// on tiles they've seen (the map shows seen tiles as they are now).
+	for (int i = 0; i < save->getMapSizeXYZ(); ++i)
+	{
+		Tile *tile = save->getTile(i);
+		bool seen = discovered(tile, 2);
+		MapData *floor = tile->getMapData(O_FLOOR);
+		if (floor && seen && tile->getPosition().z > 0)
+			_terrainBefore.push_back({ tile, O_FLOOR, floor });
+		MapData *west = tile->getMapData(O_WESTWALL);
+		if (west && (seen || discovered(tile, 0)))
+			_terrainBefore.push_back({ tile, O_WESTWALL, west });
+		MapData *north = tile->getMapData(O_NORTHWALL);
+		if (north && (seen || discovered(tile, 1)))
+			_terrainBefore.push_back({ tile, O_NORTHWALL, north });
+		MapData *object = tile->getMapData(O_OBJECT);
+		if (object && seen && (object->getBigWall() != 0 || tile->getTUCost(O_OBJECT, MT_WALK) >= 255))
+			_terrainBefore.push_back({ tile, O_OBJECT, object });
+	}
 }
 
 namespace
@@ -1611,6 +1639,34 @@ namespace
 		}
 		return Vocab::format(Vocab::UNIT_HIT, { name });
 	}
+
+	/// hitText, plus whose fire it was when one of ours hit another of ours, since the killed
+	/// line that may follow doesn't say: "Hannele hits Avinashi, friendly fire" for a unit that
+	/// went down, "friendly fire from Cherubin, Radu hit, health 31" otherwise.
+	std::string impactText(BattleUnit *unit, const UnitBefore &before, BattleUnit *attacker)
+	{
+		std::string text = hitText(unit, before);
+		if (!attacker || attacker == unit || attacker->getFaction() != FACTION_PLAYER || unit->getFaction() != FACTION_PLAYER)
+			return text;
+		if (text.empty())
+			return Vocab::format(Vocab::FRIENDLY_FIRE, { unitLabel(unit), unitLabel(attacker) });
+		return joinComma({ Vocab::format(Vocab::FRIENDLY_FIRE_FROM, { unitLabel(attacker) }), text });
+	}
+
+	/// The terrain from the snapshot that's gone or changed: "wooden wall and window destroyed".
+	std::string destroyedText()
+	{
+		std::vector<std::string> names;
+		for (const TerrainBefore &t : _terrainBefore)
+		{
+			if (t.tile->getMapData(t.part) == t.data)
+				continue;
+			std::string name = TerrainNames::get(t.data);
+			if (!name.empty() && std::find(names.begin(), names.end(), name) == names.end())
+				names.push_back(name);
+		}
+		return names.empty() ? std::string() : Vocab::format(Vocab::TERRAIN_DESTROYED, { joinAnd(names) });
+	}
 }
 
 void endImpact(SavedBattleGame *save, BattleUnit *attacker, bool areaEffect)
@@ -1628,7 +1684,7 @@ void endImpact(SavedBattleGame *save, BattleUnit *attacker, bool areaEffect)
 			if (!b.second.shown || (unit->getHealth() >= b.second.health && unit->getStunlevel() <= b.second.stun))
 				continue;
 			anyone = true;
-			std::string text = hitText(unit, b.second);
+			std::string text = impactText(unit, b.second, attacker);
 			if (!text.empty())
 				say(text, false);
 		}
@@ -1643,10 +1699,7 @@ void endImpact(SavedBattleGame *save, BattleUnit *attacker, bool areaEffect)
 		std::map<BattleUnit *, UnitBefore>::const_iterator b = unit ? _before.find(unit) : _before.end();
 		if (b != _before.end() && b->second.shown)
 		{
-			std::string text = hitText(unit, b->second);
-			// Our own fire hitting one of ours: say whose, since the killed line that may follow doesn't.
-			if (attacker && attacker != unit && attacker->getFaction() == FACTION_PLAYER && unit->getFaction() == FACTION_PLAYER)
-				text = joinComma({ Vocab::format(Vocab::FRIENDLY_FIRE, { unitLabel(unit), unitLabel(attacker) }), text });
+			std::string text = impactText(unit, b->second, attacker);
 			if (!text.empty())
 				say(text, false);
 		}
@@ -1657,7 +1710,11 @@ void endImpact(SavedBattleGame *save, BattleUnit *attacker, bool areaEffect)
 			say(piece.empty() ? Vocab::get(Vocab::MISSED) : Vocab::format(Vocab::MISSED_INTO, { piece }), false);
 		}
 	}
+	std::string destroyed = destroyedText();
+	if (!destroyed.empty())
+		say(destroyed, false);
 	_before.clear();
+	_terrainBefore.clear();
 }
 
 void shotOffMap(SavedBattleGame *save)

@@ -329,6 +329,8 @@ namespace
 		"force fire is off in the options",
 		"Control Enter is force fire, while aiming a gun",
 		"{1} hits {0}, friendly fire",
+		"friendly fire from {0}",
+		"{0} destroyed",
 	};
 }
 
