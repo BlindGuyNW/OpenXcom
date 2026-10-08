@@ -117,6 +117,8 @@
 #include "../Geoscape/DogfightErrorState.h"
 #include "../Geoscape/InterceptState.h"
 #include "../Geoscape/SelectDestinationState.h"
+#include "../Geoscape/UfoTrackerState.h"
+#include "../Savegame/Ufo.h"
 #include "../Savegame/Base.h"
 #include "../Savegame/Craft.h"
 #include "../Savegame/Soldier.h"
@@ -2918,6 +2920,37 @@ AccessScreen modList()
 	return s;
 }
 
+/// UFO tracker (T, OXCE): the title, then a row per detected UFO, alien site and discovered alien base
+/// ("UFO-3, SIZE: Small, ALTITUDE: Low, HEADING: North, SPEED: 2,000"; sites and bases are just named).
+/// Enter opens the target's popup, Backspace centres the globe on it (the game's left and right clicks);
+/// Ctrl+Enter opens the UFO's Ufopaedia article (the middle click), which the game allows only for a UFO
+/// a hyper-wave decoder identified, and otherwise silently ignores.
+AccessScreen ufoTracker()
+{
+	AccessScreen s = tableScreen("ufoTracker", is<UfoTrackerState>, { "STR_SIZE_UC", "STR_ALTITUDE", "STR_HEADING", "STR_SPEED" });
+	s.keys = [](State *state, const ControlId &focus, SDLKey key, bool, bool ctrl)
+	{
+		UfoTrackerState *tracker = static_cast<UfoTrackerState *>(state);
+		TextList *list = tracker->getList();
+		if (!ctrl || (key != SDLK_RETURN && key != SDLK_KP_ENTER) || !focus.ReferenceMatches(list))
+			return false;
+		size_t at = focus.StructuralKey.rfind(":row:");
+		if (at == std::string::npos)
+			return false;
+		size_t row = std::stoul(focus.StructuralKey.substr(at + 5));
+		const std::vector<Target *> &objects = tracker->getObjects();
+		Ufo *ufo = row < objects.size() ? dynamic_cast<Ufo *>(objects[row]) : 0;
+		if (!ufo || !ufo->getHyperDetected())
+		{
+			Speech::say(Vocab::get(Vocab::NO_UFOPAEDIA_ARTICLE), true);
+			return true;
+		}
+		Controls::clickRow(state, list, row, SDL_BUTTON_MIDDLE);
+		return true;
+	};
+	return s;
+}
+
 /// Funding (F): the title, then "sort by COUNTRY", "sort by FUNDING", "sort by CHANGE" (the active one
 /// says its order; Enter sorts, again to reverse), the countries ("Brazil, FUNDING: $600,000, CHANGE:
 /// +$20,000") and the total, then OK. The game shows the sort only as an arrow on the active column.
@@ -3677,6 +3710,7 @@ const std::vector<AccessScreen> &all()
 		popupScreen("targetInfo", is<TargetInfoState>),
 		popupScreen("geoscapeCraft", is<GeoscapeCraftState>),
 		popupScreen("confirmDestination", is<ConfirmDestinationState>),
+		ufoTracker(),
 		simpleScreen("ufopaediaStart", is<UfopaediaStartState>),
 		intercept(),
 		selectDestination(),

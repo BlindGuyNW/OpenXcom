@@ -331,6 +331,7 @@ namespace
 		"{1} hits {0}, friendly fire",
 		"friendly fire from {0}",
 		"{0} destroyed",
+		"no Ufopaedia article, the UFO is not identified",
 	};
 }
 

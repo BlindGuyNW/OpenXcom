@@ -60,6 +60,10 @@ public:
 	void lstObjectsRightClick(Action *action);
 	/// Handler for middle clicking the Objects list.
 	void lstObjectsMiddleClick(Action *action);
+	/// Gets the objects list.
+	TextList *getList() const { return _lstObjects; }
+	/// Gets the target on each row.
+	const std::vector<Target*> &getObjects() const { return _objects; }
 };
 
 }

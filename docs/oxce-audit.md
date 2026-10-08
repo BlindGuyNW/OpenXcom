@@ -109,7 +109,7 @@ Next, in a plain campaign:
 - [x] UnitInfo (S in battle; played 2026-10-06): name on arrival, one item per stat ("16 of 65" from the bar's maximum, "stun N" from its second value; stun not yet seen), previous/next soldier say the new name. Mind probe not yet seen.
 - [ ] ItemLocations (Enter on Stores, Purchase, Sell, Transfer).
 
-Later in a campaign: AllocatePsiTraining and TrainingFinished (Psi Lab), SoldierDiary overview, performance and mission (soldier info's Diary button), the tech tree viewers, the Global research, manufacture and containment screens, UfoTracker, Notes, StatsForNerds, TurnDiary and the hit log (Ctrl+H, an Infobox, now read), ExperienceOverview, AlienInventory, SelectMusicTrack, the inventory and craft-equipment template dialogs, BriefingLight.
+Later in a campaign: AllocatePsiTraining and TrainingFinished (Psi Lab), SoldierDiary overview, performance and mission (soldier info's Diary button), the tech tree viewers, the Global research, manufacture and containment screens, Notes, StatsForNerds, TurnDiary and the hit log (Ctrl+H, an Infobox, now read), ExperienceOverview, AlienInventory, SelectMusicTrack, the inventory and craft-equipment template dialogs, BriefingLight.
 
 Not reachable with this setup: GeoscapeEvent, pilots, transformations, SkillMenu, SoldierBonus (mods); the Extended links menus (`oxceLinks`); SelectStartFacility and PlaceStartFacility (`customInitialBase`); MiniMap (the cursor replaces it); TFTD, unit and soldier articles (not in `xcom1`, probably).
 
