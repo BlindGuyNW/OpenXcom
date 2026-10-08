@@ -113,6 +113,8 @@ namespace
 	std::map<BattleUnit *, UnitBefore> _before;
 	/// We started an action; speak the result once the game is idle again.
 	bool _awaiting = false;
+	/// We set the game's touch-screen Ctrl for a force fire; cleared once the shot is over.
+	bool _forcing = false;
 	/// When Ctrl+E was first pressed; a second press soon after ends the turn.
 	Uint32 _endTurnArmed = 0;
 	const Uint32 END_TURN_WINDOW = 3000;
@@ -569,24 +571,16 @@ namespace
 		map->setSelectorTile(_cursor);
 	}
 
-	/// Why a soldier can't see a unit, checked in TileEngine::visible's order: too far, too dark,
-	/// then outside the 90 degree view cone, then a sight line from the eyes to the unit's middle,
-	/// naming what it hits. A sighted player sees the map, so the obstacle is named only if its
-	/// tile has been seen. Empty when there's no clear reason (the game also tries other lines).
-	std::string outOfViewReason(SavedBattleGame *save, BattleUnit *viewer, BattleUnit *unit)
+	/// What a straight line from a voxel to a unit's middle meets first, as "blocked by stone wall"
+	/// (or "blocked by Sectoid 2", or plain "blocked" for something not seen), or with smoke counted,
+	/// "smoke" when the line gets through. A sighted player sees the map, so the obstacle is named only
+	/// if its tile has been seen. Empty when the line reaches the unit. The game tries several lines,
+	/// so this one is a best guess at what's in the way.
+	std::string lineBlocker(SavedBattleGame *save, Position origin, BattleUnit *viewer, BattleUnit *unit, bool smoke)
 	{
 		TileEngine *engine = save->getTileEngine();
-		Position from = viewer->getPosition(), to = unit->getPosition();
-		int dist = Position::distance2d(from, to);
-		if (dist > engine->getMaxViewDistance())
-			return Vocab::get(Vocab::VIEW_TOO_FAR);
+		Position to = unit->getPosition();
 		Tile *target = save->getTile(to);
-		if (viewer->getFaction() == FACTION_PLAYER && dist > 9 && target->getShade() > engine->getMaxDarknessToSeeUnits())
-			return Vocab::get(Vocab::VIEW_TOO_DARK);
-		if (!viewer->checkViewSector(to))
-			return Vocab::get(Vocab::VIEW_FACING_AWAY);
-
-		Position origin = engine->getSightOriginVoxel(viewer);
 		Position aim(to.x * 16 + 8, to.y * 16 + 8, to.z * 24 - target->getTerrainLevel() + unit->getFloatHeight() + unit->getHeight() / 2);
 		std::vector<Position> line;
 		int hit = engine->calculateLineVoxel(origin, aim, true, &line, viewer);
@@ -605,6 +599,8 @@ namespace
 			if (blocker && blocker != unit)
 				return unitShown(blocker) ? Vocab::format(Vocab::VIEW_BLOCKED_BY, { unitLabel(blocker) }) : Vocab::get(Vocab::VIEW_BLOCKED);
 			// The line reaches the unit, so it's the smoke along the way.
+			if (!smoke)
+				return std::string();
 			for (const Position &p : line)
 			{
 				Tile *t = save->getTile(Position(p.x / 16, p.y / 16, p.z / 24));
@@ -621,12 +617,73 @@ namespace
 		return name.empty() ? Vocab::get(Vocab::VIEW_BLOCKED) : Vocab::format(Vocab::VIEW_BLOCKED_BY, { name });
 	}
 
-	/// While aiming: whether the soldier can see the unit on a tile. That's what the HUD's
-	/// numbered enemy buttons show, so a sighted player knows it too.
-	std::string targetText(BattlescapeState *state, Position p)
+	/// Why a soldier can't see a unit, checked in TileEngine::visible's order: too far, too dark,
+	/// then outside the 90 degree view cone, then a sight line from the eyes to the unit's middle
+	/// (lineBlocker). Empty when there's no clear reason.
+	std::string outOfViewReason(SavedBattleGame *save, BattleUnit *viewer, BattleUnit *unit)
+	{
+		TileEngine *engine = save->getTileEngine();
+		Position from = viewer->getPosition(), to = unit->getPosition();
+		int dist = Position::distance2d(from, to);
+		if (dist > engine->getMaxViewDistance())
+			return Vocab::get(Vocab::VIEW_TOO_FAR);
+		Tile *target = save->getTile(to);
+		if (viewer->getFaction() == FACTION_PLAYER && dist > 9 && target->getShade() > engine->getMaxDarknessToSeeUnits())
+			return Vocab::get(Vocab::VIEW_TOO_DARK);
+		if (!viewer->checkViewSector(to))
+			return Vocab::get(Vocab::VIEW_FACING_AWAY);
+
+		return lineBlocker(save, engine->getSightOriginVoxel(viewer), viewer, unit, true);
+	}
+
+	/// Whether a gun shot can reach the unit on a tile: ProjectileFlyBState's test, a line from the
+	/// gun (TileEngine::getOriginVoxel, lower than the eyes and at the tile's edge toward the target)
+	/// to some part of the unit that meets the unit first; with OXCE's off-centre shooting option, also
+	/// from beside the gun. Without one the game refuses the shot ("No Line of Fire!").
+	/// Sets origin to the gun's centre voxel, for naming what's in the way.
+	bool lineOfFire(SavedBattleGame *save, BattleAction *action, Position target, Position *origin)
+	{
+		TileEngine *engine = save->getTileEngine();
+		Tile *tile = save->getTile(target);
+		Tile *from = save->getTile(action->actor->getPosition());
+		BattleAction a = *action;
+		a.target = target;
+		a.relativeOrigin = BattleActionOrigin::CENTRE;
+		*origin = engine->getOriginVoxel(a, from);
+		Position o = *origin, scan;
+		if (engine->canTargetUnit(&o, tile, &scan, action->actor, false))
+			return true;
+		if (Options::oxceEnableOffCentreShooting)
+		{
+			for (BattleActionOrigin rel : { BattleActionOrigin::LEFT, BattleActionOrigin::RIGHT })
+			{
+				a.relativeOrigin = rel;
+				o = engine->getOriginVoxel(a, from);
+				if (engine->canTargetUnit(&o, tile, &scan, action->actor, false))
+					return true;
+			}
+		}
+		return false;
+	}
+
+	/// A gun shot: the actions ProjectileFlyBState tests for a line of fire (not throws, arcing shots or launches).
+	bool isGunShot(BattleAction *action)
+	{
+		BattleActionType t = action->type;
+		return (t == BA_SNAPSHOT || t == BA_AIMEDSHOT || t == BA_AUTOSHOT) && action->weapon && !action->weapon->getArcingShot(t);
+	}
+
+	/// While aiming, about the unit on a tile. For a gun shot, whether it can reach the unit
+	/// ("clear shot", or "no line of fire, blocked by window"), then "out of view" if the soldier
+	/// can't see it (seeing is from the eyes, shooting from the gun, so the two can differ; the
+	/// reason why not is left for Ctrl+L). For other aims (throws, launchers, psi), whether the
+	/// soldier can see it, and why not. Seeing is what the HUD's numbered enemy buttons show;
+	/// a sighted player learns of a missing line of fire by trying, at no cost.
+	std::string targetText(BattlescapeState *state, Position p, bool full = false)
 	{
 		BattleAction *action = state->getBattleGame()->getCurrentAction();
-		Tile *tile = saveOf(state)->getTile(p);
+		SavedBattleGame *save = saveOf(state);
+		Tile *tile = save->getTile(p);
 		if (!action->targeting || !action->actor || !tile || !discovered(tile, 2))
 			return std::string();
 		BattleUnit *unit = tile->getUnit();
@@ -634,11 +691,29 @@ namespace
 			return std::string();
 		if (unit->getFaction() == FACTION_PLAYER)
 			return Vocab::get(Vocab::FRIENDLY);
+		std::vector<std::string> parts;
+		bool gunShot = isGunShot(action);
+		if (gunShot)
+		{
+			Position origin;
+			if (lineOfFire(save, action, p, &origin))
+				parts.push_back(Vocab::get(Vocab::CLEAR_SHOT));
+			else
+				parts.push_back(joinComma({ Vocab::get(Vocab::NO_LINE_OF_FIRE), lineBlocker(save, origin, action->actor, unit, false) }));
+		}
 		std::vector<BattleUnit *> *seen = action->actor->getVisibleUnits();
 		if (std::find(seen->begin(), seen->end(), unit) != seen->end())
-			return Vocab::get(Vocab::IN_VIEW);
-		std::string why = outOfViewReason(saveOf(state), action->actor, unit);
-		return why.empty() ? Vocab::get(Vocab::OUT_OF_VIEW) : joinComma({ Vocab::get(Vocab::OUT_OF_VIEW), why });
+		{
+			if (!gunShot || full)
+				parts.push_back(Vocab::get(Vocab::IN_VIEW));
+		}
+		else
+		{
+			parts.push_back(Vocab::get(Vocab::OUT_OF_VIEW));
+			if (!gunShot || full)
+				parts.push_back(outOfViewReason(save, action->actor, unit));
+		}
+		return joinComma(parts);
 	}
 
 	void moveCursor(BattlescapeState *state, Position to, bool levelChange, bool interrupt = true)
@@ -799,6 +874,30 @@ namespace
 			say(Vocab::format(Vocab::PATH_COST, { num(cost), num(tus - cost), route }), true);
 		else
 			say(Vocab::format(Vocab::PATH_TOO_FAR, { num(cost), num(tus), route }), true);
+	}
+
+	/// Ctrl+Enter while aiming a gun: the game's force fire (Ctrl+click with Options::forceFire),
+	/// which shoots at the middle of the tile without looking for a line of fire to anyone on it,
+	/// to blow out a window or a wall, say. The navigator clears the real modifiers while the layer
+	/// acts, so this sets the game's sticky touch-screen Ctrl (Game::isCtrlPressed(true) reads it)
+	/// for the length of the shot; update() clears it once the game is idle.
+	void forceFire(BattlescapeState *state)
+	{
+		BattleAction *action = state->getBattleGame()->getCurrentAction();
+		if (!action->targeting || !isGunShot(action))
+		{
+			say(Vocab::get(Vocab::FORCE_FIRE_NOT_AIMING), true);
+			return;
+		}
+		if (!Options::forceFire)
+		{
+			say(Vocab::get(Vocab::FORCE_FIRE_OFF), true);
+			return;
+		}
+		say(Vocab::get(Vocab::FORCE_FIRE), true);
+		state->getGame()->setCtrlPressedFlag(true);
+		_forcing = true;
+		primary(state);
 	}
 
 	/// Backspace: a right click on the cursor tile. Cancels a preview or targeting first, like the mouse.
@@ -1025,9 +1124,6 @@ namespace
 		SavedBattleGame *save = saveOf(state);
 		BattleAction *action = state->getBattleGame()->getCurrentAction();
 		BattleUnit *shooter = action->targeting ? action->actor : 0;
-		Position origin;
-		if (shooter)
-			origin = save->getTileEngine()->getOriginVoxel(*action, save->getTile(shooter->getPosition()));
 		Position from = anchor();
 		Position best = anchorPos;
 		int bestScore = INT_MAX;
@@ -1041,8 +1137,8 @@ namespace
 					continue;
 				int dx = p.x - from.x, dy = p.y - from.y;
 				int score = dx * dx + dy * dy;
-				Position scanVoxel;
-				if (shooter && !save->getTileEngine()->canTargetUnit(&origin, tile, &scanVoxel, shooter, false))
+				Position gun;
+				if (shooter && !lineOfFire(save, action, p, &gun))
 					score += 1000000;
 				if (score < bestScore)
 				{
@@ -1162,7 +1258,8 @@ namespace
 		Position from = projectile->getOrigin(), at = projectile->getTarget();
 		BattleUnit *shooter = projectile->getActor();
 		// Our shots on our turn are the player's own keypresses. On the aliens' turn they're reaction fire, worth saying.
-		if (shooter && shooter->getFaction() == FACTION_PLAYER && save->getSide() == FACTION_PLAYER)
+		// A panicking soldier's berserk fire isn't the player's, so it's said like the aliens'.
+		if (shooter && shooter->getFaction() == FACTION_PLAYER && save->getSide() == FACTION_PLAYER && state->getBattleGame()->getPanicHandled())
 			return;
 		Uint32 now = SDL_GetTicks();
 		if (from == _shotFrom && at == _shotAt && now - _shotTime < BURST_WINDOW)
@@ -1214,6 +1311,7 @@ namespace
 		_shotPending = false;
 		_shotTime = 0;
 		_reportShot = false;
+		_forcing = false;
 		_before.clear();
 		_labels.clear();
 		_lastLabel.clear();
@@ -1249,11 +1347,15 @@ bool handleKey(BattlescapeState *state, SDLKey key, bool shift, bool ctrl)
 			text += ", " + Vocab::format(Vocab::LEVEL, { num(_cursor.z + 1) });
 			text += ", " + offsetText(anchor(), _cursor);
 			text += ", " + Vocab::format(Vocab::COORDS, { num(_cursor.x), num(_cursor.y) });
-			say(text, true);
+			say(joinComma({ text, targetText(state, _cursor, true) }), true);
 			return true;
 		}
 		case SDLK_e:
 			endTurn(state);
+			return true;
+		case SDLK_RETURN:
+		case SDLK_KP_ENTER:
+			forceFire(state);
 			return true;
 		default:
 			return false;
@@ -1344,6 +1446,12 @@ void update(BattlescapeState *state)
 	SavedBattleGame *save = saveOf(state);
 	if (save != _battle)
 		reset(save);
+
+	if (_forcing && !state->getBattleGame()->isBusy())
+	{
+		state->getGame()->setCtrlPressedFlag(false);
+		_forcing = false;
+	}
 
 	// The selection differ: the cursor follows the selected soldier and says who it is.
 	BattleUnit *selected = save->getSelectedUnit();
@@ -1536,6 +1644,9 @@ void endImpact(SavedBattleGame *save, BattleUnit *attacker, bool areaEffect)
 		if (b != _before.end() && b->second.shown)
 		{
 			std::string text = hitText(unit, b->second);
+			// Our own fire hitting one of ours: say whose, since the killed line that may follow doesn't.
+			if (attacker && attacker != unit && attacker->getFaction() == FACTION_PLAYER && unit->getFaction() == FACTION_PLAYER)
+				text = joinComma({ Vocab::format(Vocab::FRIENDLY_FIRE, { unitLabel(unit), unitLabel(attacker) }), text });
 			if (!text.empty())
 				say(text, false);
 		}

@@ -136,7 +136,7 @@ namespace
 		"{0} to {1}",
 		"put back",
 		"fire from {0}",
-		"fire from {0} at {1}",
+		"fire at {1} from {0}",
 		"{0} fires",
 		"{0} fires at {1}",
 		"above",
@@ -323,6 +323,12 @@ namespace
 		"large",
 		"very large",
 		"huge",
+		"clear shot",
+		"no line of fire",
+		"force fire",
+		"force fire is off in the options",
+		"Control Enter is force fire, while aiming a gun",
+		"{1} hits {0}, friendly fire",
 	};
 }
 
